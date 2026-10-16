@@ -11,6 +11,7 @@ coating.** Start with `diag`. It tells you in one second whether a module is ali
 | `flash.sh` | Compile and upload from the terminal (base / remote / any sketch), with the retries avrdude needs. |
 | `sketches/radiodiag/` | Standalone deep check of the radio and the Nano's pins (no RF24 library). |
 | `sketches/radiowatch/` | Standalone version of the press test (before `watch` was built into the firmware). |
+| `sketches/channelscan/` | How often each radio channel 0-125 has a strong signal on it: where the interference is, which channels are quiet. Switch the other board off while it runs. |
 | `sketches/rf24_getting_started/` | The RF24 library's own example with CE=9, as an independent "is the radio alive" check. |
 | `tests/` | Fake-board tests for `weather_ui.py` and `radio_watch.py`; no hardware needed. |
 | `results/2026-10-14/` | Raw recordings referred to below. |
@@ -26,6 +27,7 @@ open, and the tools refuse to start if another one has it.
 | Radio comes and goes | `python3 debug/radio_watch.py`, then press/tilt/tap the module one spot at a time. |
 | Need more detail on the radio | `debug/flash.sh debug/sketches/radiodiag`, then `python3 debug/serial_probe.py --secs 20` |
 | Is it my code or the hardware? | `debug/flash.sh debug/sketches/rf24_getting_started` (prints "not responding" if the hardware is at fault) |
+| A channel works badly or one way only | Other board off, then `debug/flash.sh debug/sketches/channelscan`, then `python3 debug/serial_probe.py --secs 65` |
 | Put the real firmware back | `debug/flash.sh base` or `debug/flash.sh remote --pa max` |
 
 With both boards plugged in, add `--board 2CF4` or `--board B800` (start of the USB serial number);
