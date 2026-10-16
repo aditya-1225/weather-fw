@@ -18,6 +18,7 @@ import datetime as dt
 import glob
 import os
 import sys
+import tempfile
 import time
 from bisect import bisect_left
 
@@ -25,7 +26,7 @@ from PySide6.QtCore import QPointF, QRectF, Qt, QTimer
 from PySide6.QtGui import QColor, QFont, QFontDatabase, QGuiApplication, QPainter, QPainterPath, QPen
 from PySide6.QtWidgets import (QApplication, QButtonGroup, QComboBox, QFrame, QGridLayout, QHBoxLayout,
                                QLabel, QLineEdit, QMainWindow, QMessageBox, QPlainTextEdit, QPushButton,
-                               QScrollArea, QSizePolicy, QSpinBox, QTabWidget, QVBoxLayout, QWidget)
+                               QScrollArea, QSizePolicy, QSpinBox, QVBoxLayout, QWidget)
 
 from weather_settings import (DEFAULT_LINK, DEFAULT_RETRY, DEFAULT_SENSOR, FILTER_COEF, OVERSAMPLING, PA_DBM,
                               STANDBY_MS, Link, Retry, Sensor)
@@ -38,25 +39,60 @@ SPANS = [("5 min", 300), ("15 min", 900), ("1 hour", 3600), ("2 hours", 7200), (
          ("24 hours", 86400)]
 
 THEMES = {
-    "dark": dict(bg="#131c28", surface="#1a2533", raised="#223044", line="#2c3b50", hover="#2a3a52",
-                 text="#e6edf5", text2="#a3b1c2", muted="#74859a",
+    "dark": dict(bg="#0f0f10", surface="#18181a", raised="#222225", line="#2f2f33", hover="#2a2a2e",
+                 text="#ececee", text2="#a6a6ad", muted="#77777f",
                  base="#3987e5", remote="#199e70", accent="#3987e5", on_accent="#ffffff",
                  good="#0ca30c", warn="#fab219", crit="#e05252"),
-    "light": dict(bg="#e8edf3", surface="#f8fafc", raised="#ffffff", line="#d2dbe5", hover="#eef2f7",
-                  text="#142030", text2="#4a5b6e", muted="#6e7f93",
+    "light": dict(bg="#ececee", surface="#f9f9fa", raised="#ffffff", line="#dadade", hover="#f0f0f2",
+                  text="#18181b", text2="#4f4f57", muted="#717179",
                   base="#2a78d6", remote="#1baf7a", accent="#2a78d6", on_accent="#ffffff",
                   good="#0a870a", warn="#b77b00", crit="#d03b3b"),
 }
 
 
+def rgba(color, alpha):
+    """'#rrggbb' at `alpha` (0-1), for tinted backgrounds."""
+    r, g, b = (int(color[i:i + 2], 16) for i in (1, 3, 5))
+    return f"rgba({r}, {g}, {b}, {alpha})"
+
+
+ICON_DIR = os.path.join(tempfile.gettempdir(), f"weather_gui_icons_{os.getpid()}")
+CHEVRONS = {"down": "M3 6l5 5 5-5", "up": "M3 10l5-5 5 5"}
+
+
+def icon(name, color):
+    """Path of a small chevron in `color`, as an SVG file: Qt style sheets take arrow images only as files."""
+    os.makedirs(ICON_DIR, exist_ok=True)
+    path = os.path.join(ICON_DIR, f"{name}_{color.lstrip('#')}.svg")
+    if not os.path.exists(path):
+        with open(path, "w") as f:
+            f.write(f'<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">'
+                    f'<path d="{CHEVRONS[name]}" fill="none" stroke="{color}" stroke-width="1.8" '
+                    f'stroke-linecap="round" stroke-linejoin="round"/></svg>')
+    return path.replace(os.sep, "/")
+
+
+# Heights the style sheet relies on. Qt draws a corner square when its radius is more than half the
+# widget's height, so every rounded thing has a fixed height and a radius that fits it.
+FIELD_H = 32        # boxes, buttons
+PILL_H = 24
+
+
 def qss(t):
+    down, up = icon("down", t['text2']), icon("up", t['text2'])
+    down_off, up_off = icon("down", t['muted']), icon("up", t['muted'])
+    pills = "".join(f"""
+    QLabel#pill[tone="{k}"] {{ color: {t[k]}; background: {rgba(t[k], 0.13)}; border-color: {rgba(t[k], 0.45)}; }}"""
+                    for k in ("good", "warn", "crit"))
     return f"""
     QWidget {{ color: {t['text']}; font-size: 13px; }}
     QMainWindow, QScrollArea, #page {{ background: {t['bg']}; }}
     QFrame#card {{ background: {t['surface']}; border: 1px solid {t['line']}; border-radius: 14px; }}
-    QFrame#strip {{ background: {t['surface']}; border: 1px solid {t['line']}; border-radius: 10px; }}
-    QFrame#tile {{ background: {t['raised']}; border-radius: 8px; }}
-    QFrame#rule {{ background: {t['line']}; max-height: 1px; min-height: 1px; }}
+    QFrame#strip {{ background: {t['surface']}; border: 1px solid {t['line']}; border-radius: 12px; }}
+    QFrame#tile {{ background: {t['raised']}; border-radius: 10px; }}
+    QFrame#info {{ background: {t['raised']}; border-radius: 10px; }}
+    QFrame#rule {{ background: {t['line']}; max-height: 1px; min-height: 1px; border: none; }}
+    QFrame#vrule {{ background: {t['line']}; max-width: 1px; min-width: 1px; border: none; }}
     QLabel {{ background: transparent; }}
     QLabel[role="app"] {{ font-size: 22px; font-weight: 600; }}
     QLabel[role="hero"] {{ font-size: 68px; font-weight: 300; }}
@@ -66,6 +102,7 @@ def qss(t):
     QLabel[role="section"] {{ font-size: 14px; font-weight: 600; }}
     QLabel[role="sub"] {{ color: {t['text2']}; }}
     QLabel[role="muted"] {{ color: {t['muted']}; font-size: 12px; }}
+    QLabel[role="caps"] {{ color: {t['muted']}; font-size: 11px; font-weight: 600; letter-spacing: 1px; }}
     QLabel[role="tilelabel"] {{ color: {t['text2']}; font-size: 12px; }}
     QLabel[role="tilevalue"] {{ font-size: 16px; font-weight: 600; }}
     QLabel[role="metric"] {{ color: {t['text2']}; }}
@@ -74,43 +111,175 @@ def qss(t):
     QLabel[tone="crit"] {{ color: {t['crit']}; }}
     QLabel[tone="dim"] {{ color: {t['muted']}; }}
     QLabel[role="hero"][tone="dim"] {{ color: {t['muted']}; }}
-    QLabel#pill {{ border-radius: 11px; padding: 2px 10px; font-weight: 600; font-size: 12px;
-                   border: 1px solid {t['line']}; }}
-    QLabel#pill[tone="good"] {{ border-color: {t['good']}; }}
-    QLabel#pill[tone="warn"] {{ border-color: {t['warn']}; }}
-    QLabel#pill[tone="crit"] {{ border-color: {t['crit']}; }}
-    QPushButton {{ background: {t['raised']}; border: 1px solid {t['line']}; border-radius: 8px;
-                   padding: 6px 12px; }}
+    QLabel#pill {{ border-radius: {PILL_H // 2}px; padding: 0 11px; font-weight: 600; font-size: 12px;
+                   border: 1px solid {t['line']}; background: {t['raised']}; color: {t['text2']}; }}{pills}
+
+    QPushButton {{ background: {t['raised']}; border: 1px solid {t['line']}; border-radius: 8px; padding: 0 14px;
+                   min-height: {FIELD_H - 2}px; max-height: {FIELD_H - 2}px; }}
     QPushButton:hover {{ background: {t['hover']}; }}
     QPushButton:pressed {{ background: {t['line']}; }}
-    QPushButton:focus {{ border: 1px solid {t['accent']}; }}
+    QPushButton:focus {{ border-color: {t['accent']}; }}
     QPushButton:disabled {{ color: {t['muted']}; background: transparent; }}
     QPushButton[kind="primary"] {{ background: {t['accent']}; color: {t['on_accent']}; border-color: {t['accent']};
                                    font-weight: 600; }}
-    QPushButton[kind="primary"]:hover {{ background: {t['accent']}; border-color: {t['text']}; }}
+    QPushButton[kind="primary"]:hover {{ border-color: {t['text']}; }}
+    QPushButton[kind="primary"]:disabled {{ background: {t['line']}; border-color: {t['line']}; color: {t['muted']}; }}
     QPushButton[kind="danger"] {{ color: {t['crit']}; }}
-    QPushButton[kind="danger"]:hover {{ border-color: {t['crit']}; }}
-    QPushButton[kind="seg"] {{ padding: 3px 10px; border-radius: 6px; font-size: 12px; background: transparent; }}
-    QPushButton[kind="seg"]:checked {{ background: {t['raised']}; border-color: {t['line']}; font-weight: 600; }}
-    QSpinBox, QComboBox, QLineEdit {{ background: {t['raised']}; border: 1px solid {t['line']};
-                   border-radius: 8px; padding: 5px 8px; selection-background-color: {t['accent']}; }}
-    QSpinBox:focus, QComboBox:focus, QLineEdit:focus {{ border-color: {t['accent']}; }}
-    QComboBox QAbstractItemView {{ background: {t['raised']}; border: 1px solid {t['line']};
-                   selection-background-color: {t['accent']}; }}
+    QPushButton[kind="danger"]:hover {{ border-color: {t['crit']}; background: {rgba(t['crit'], 0.10)}; }}
+    QPushButton[kind="ghost"] {{ background: transparent; border-color: transparent; color: {t['text2']}; }}
+    QPushButton[kind="ghost"]:hover {{ background: {t['hover']}; color: {t['text']}; }}
+
+    QFrame#segtrack {{ background: {t['bg']}; border: 1px solid {t['line']}; border-radius: 10px; }}
+    QPushButton[kind="seg"] {{ background: transparent; border: 1px solid transparent; border-radius: 7px;
+                               padding: 0 14px; min-height: 26px; max-height: 26px; color: {t['text2']}; }}
+    QPushButton[kind="seg"]:hover {{ color: {t['text']}; }}
+    QPushButton[kind="seg"]:checked {{ background: {t['raised']}; border-color: {t['line']}; color: {t['text']};
+                                       font-weight: 600; }}
+
+    QComboBox, QSpinBox, QLineEdit {{ background: {t['raised']}; border: 1px solid {t['line']}; border-radius: 8px;
+                   min-height: {FIELD_H - 2}px; max-height: {FIELD_H - 2}px;
+                   selection-background-color: {t['accent']}; selection-color: {t['on_accent']}; }}
+    QLineEdit {{ padding: 0 10px; }}
+    QComboBox {{ padding: 0 30px 0 10px; combobox-popup: 0; }}
+    QComboBox:hover, QSpinBox:hover, QLineEdit:hover {{ border-color: {t['muted']}; }}
+    QComboBox:focus, QSpinBox:focus, QLineEdit:focus, QComboBox:on {{ border-color: {t['accent']}; }}
+    QComboBox::drop-down {{ subcontrol-origin: padding; subcontrol-position: center right; width: 28px;
+                           border: none; background: transparent; }}
+    QComboBox::down-arrow {{ image: url({down}); width: 12px; height: 12px; }}
+    QComboBox::down-arrow:on {{ image: url({up}); }}
+    QComboBox::down-arrow:disabled {{ image: url({down_off}); }}
+    QComboBox QAbstractItemView {{ background: {t['raised']}; border: 1px solid {t['line']}; border-radius: 10px;
+                   padding: 4px; outline: 0; color: {t['text']}; }}
+    QComboBox QAbstractItemView::item {{ min-height: 28px; padding: 0 10px; border-radius: 6px; border: none; }}
+    QComboBox QAbstractItemView::item:hover {{ background: {t['hover']}; }}
+    QComboBox QAbstractItemView::item:selected {{ background: {t['accent']}; color: {t['on_accent']}; }}
+    QSpinBox {{ padding: 0 26px 0 10px; }}
+    QSpinBox::up-button, QSpinBox::down-button {{ subcontrol-origin: border; width: 24px; border: none;
+                   background: transparent; }}
+    QSpinBox::up-button {{ subcontrol-position: top right; border-top-right-radius: 8px; margin: 1px 1px 0 0; }}
+    QSpinBox::down-button {{ subcontrol-position: bottom right; border-bottom-right-radius: 8px; margin: 0 1px 1px 0; }}
+    QSpinBox::up-button:hover, QSpinBox::down-button:hover {{ background: {t['hover']}; }}
+    QSpinBox::up-arrow {{ image: url({up}); width: 10px; height: 10px; }}
+    QSpinBox::down-arrow {{ image: url({down}); width: 10px; height: 10px; }}
+    QSpinBox::up-arrow:disabled, QSpinBox::up-arrow:off {{ image: url({up_off}); }}
+    QSpinBox::down-arrow:disabled, QSpinBox::down-arrow:off {{ image: url({down_off}); }}
+    QComboBox:disabled, QSpinBox:disabled, QLineEdit:disabled {{ color: {t['muted']}; background: transparent; }}
+
     QPlainTextEdit {{ background: {t['raised']}; border: 1px solid {t['line']}; border-radius: 10px;
-                      padding: 6px; font-family: "Noto Sans Mono", monospace; font-size: 12px; }}
-    QScrollBar:vertical {{ background: transparent; width: 10px; }}
-    QScrollBar::handle:vertical {{ background: {t['line']}; border-radius: 5px; min-height: 30px; }}
-    QScrollBar::add-line, QScrollBar::sub-line {{ height: 0; }}
-    QToolTip {{ background: {t['raised']}; color: {t['text']}; border: 1px solid {t['line']}; }}
-    QTabWidget::pane {{ border: none; }}
-    QTabBar::tab {{ background: transparent; color: {t['text2']}; border: 1px solid transparent; border-radius: 7px;
-                    padding: 5px 14px; margin-right: 4px; }}
-    QTabBar::tab:hover {{ color: {t['text']}; }}
-    QTabBar::tab:selected {{ background: {t['raised']}; color: {t['text']}; border-color: {t['line']};
-                             font-weight: 600; }}
-    QComboBox:disabled, QSpinBox:disabled {{ color: {t['muted']}; }}
+                      padding: 8px; font-family: "Noto Sans Mono", "DejaVu Sans Mono", monospace; font-size: 12px; }}
+    QScrollBar:vertical {{ background: transparent; width: 10px; margin: 4px 2px; }}
+    QScrollBar::handle:vertical {{ background: {t['line']}; border-radius: 3px; min-height: 30px; }}
+    QScrollBar::handle:vertical:hover {{ background: {t['muted']}; }}
+    QScrollBar:horizontal {{ background: transparent; height: 10px; margin: 2px 4px; }}
+    QScrollBar::handle:horizontal {{ background: {t['line']}; border-radius: 3px; min-width: 30px; }}
+    QScrollBar::add-line, QScrollBar::sub-line {{ width: 0; height: 0; }}
+    QScrollBar::add-page, QScrollBar::sub-page {{ background: transparent; }}
+    QToolTip {{ background: {t['raised']}; color: {t['text']}; border: 1px solid {t['line']}; padding: 4px 6px; }}
+    QMessageBox {{ background: {t['surface']}; }}
     """
+
+
+def make_combo(items=(), tip=None):
+    """A drop-down whose list opens below it, with rounded corners (its window has no frame of its own)."""
+    box = QComboBox()
+    box.addItems(list(items))
+    if tip:
+        box.setToolTip(tip)
+    popup = box.view().window()
+    popup.setWindowFlags(popup.windowFlags() | Qt.FramelessWindowHint | Qt.NoDropShadowWindowHint)
+    popup.setAttribute(Qt.WA_TranslucentBackground)
+    box.view().viewport().setAutoFillBackground(False)
+    return box
+
+
+class StatusLabel(QLabel):
+    """A wrapping status line that takes no room while it has nothing to say."""
+
+    def __init__(self, role="muted"):
+        super().__init__()
+        self.setProperty("role", role)
+        self.setWordWrap(True)
+        self.hide()
+
+    def setText(self, text):
+        super().setText(text)
+        self.setVisible(bool(text))
+
+
+def pill(text="", tone=None):
+    w = label(text, tone=tone)
+    w.setObjectName("pill")
+    w.setFixedHeight(PILL_H)
+    w.setAlignment(Qt.AlignCenter)
+    return w
+
+
+class Segmented(QFrame):
+    """Buttons in a rounded track, one checked at a time. `changed(index)` on a click."""
+
+    def __init__(self, names, changed):
+        super().__init__()
+        self.setObjectName("segtrack")
+        self.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        lay = QHBoxLayout(self)
+        lay.setContentsMargins(3, 3, 3, 3)
+        lay.setSpacing(2)
+        self.group = QButtonGroup(self)
+        for i, name in enumerate(names):
+            b = QPushButton(name)
+            b.setProperty("kind", "seg")
+            b.setCheckable(True)
+            b.setFocusPolicy(Qt.NoFocus)
+            b.setCursor(Qt.PointingHandCursor)
+            self.group.addButton(b, i)
+            lay.addWidget(b)
+        self.group.button(0).setChecked(True)
+        self.group.idClicked.connect(changed)
+
+    def select(self, i):
+        self.group.button(i).setChecked(True)
+
+
+class Tabs(QWidget):
+    """Pages under a segmented control. Only the current page is shown and laid out, so a short page
+    doesn't keep the height of the longest one (QStackedWidget does, once pages have wrapping text)."""
+
+    def __init__(self):
+        super().__init__()
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(16)
+        self.names, self.pages, self.current = [], [], 0
+        self.bar_row = QHBoxLayout()
+        lay.addLayout(self.bar_row)
+        self.body = QVBoxLayout()
+        self.body.setContentsMargins(0, 0, 0, 0)
+        lay.addLayout(self.body)
+        self.bar = None
+
+    def addTab(self, page, name):
+        self.body.addWidget(page)
+        self.pages.append(page)
+        self.names.append(name)
+
+    def finish(self, extra=None):
+        """Build the control once all pages are in; `extra` goes at the right of it."""
+        self.bar = Segmented(self.names, self.setCurrentIndex)
+        self.bar_row.addWidget(self.bar)
+        self.bar_row.addStretch()
+        if extra:
+            self.bar_row.addWidget(extra)
+        self.setCurrentIndex(0)
+
+    def currentIndex(self):
+        return self.current
+
+    def setCurrentIndex(self, i):
+        self.current = i
+        if self.bar:
+            self.bar.select(i)
+        for j, page in enumerate(self.pages):
+            page.setVisible(j == i)
 
 
 def label(text="", role=None, tone=None):
@@ -384,8 +553,8 @@ class BoardCard(QFrame):
         self.subtitle = label("", "sub")
         head.addWidget(self.subtitle)
         head.addStretch()
-        self.sensor = label("", tone="dim")
-        self.sensor.setObjectName("pill")
+        self.sensor = pill()
+        self.sensor.hide()
         head.addWidget(self.sensor)
         lay.addLayout(head)
 
@@ -417,18 +586,10 @@ class BoardCard(QFrame):
         lay.addWidget(self.extra)
 
         tools = QHBoxLayout()
-        tools.setSpacing(4)
-        self.seg = QButtonGroup(self)
-        for key, text in (("temp", "Temperature"), ("press", "Pressure")):
-            b = QPushButton(text)
-            b.setProperty("kind", "seg")
-            b.setCheckable(True)
-            b.setChecked(key == "temp")
-            b.clicked.connect(lambda _=False, k=key: self.set_metric(k))
-            self.seg.addButton(b)
-            tools.addWidget(b)
+        self.seg = Segmented(["Temperature", "Pressure"], lambda i: self.set_metric(("temp", "press")[i]))
+        tools.addWidget(self.seg)
         tools.addStretch()
-        self.span = QComboBox()
+        self.span = make_combo()
         for text, s in SPANS:
             self.span.addItem(f"Last {text}", s)
         self.span.setCurrentIndex(1)
@@ -507,6 +668,7 @@ class BoardCard(QFrame):
         self.placeholder.setVisible(text is not None)
         if text is None:
             self.extra.setVisible(bool(self.extra.text()))
+            self.sensor.setVisible(bool(self.sensor.text()))
 
     def _visible(self, item, on):
         if item.widget() and item.widget() is not self.placeholder:
@@ -522,11 +684,13 @@ class BoardCard(QFrame):
             self.altitude.setText("altitude --")
             self.freshness.setText("No reading yet")
             self.sensor.setText("")
+            self.sensor.hide()
             return
         self.add_reading(r)
         ok = r["sensor_ok"]
         self.sensor.setText("Sensor OK" if ok else "⚠ Sensor not responding")
         set_tone(self.sensor, "good" if ok else "crit")
+        self.sensor.show()
         t, p, a = r["temp_c"], r["pressure_pa"], r["altitude_m"]
         self.temp.setText(f"{t:.2f}" if t is not None and ok else "--")
         self.pressure.setText(f"{p / 100:.2f} hPa" if p and ok else "-- hPa")
@@ -599,23 +763,23 @@ class Window(QMainWindow):
 
         # header
         head = QHBoxLayout()
+        head.setSpacing(10)
         head.addWidget(label("Weather link", "app"))
-        head.addSpacing(12)
-        self.conn = label("Disconnected", tone="crit")
-        self.conn.setObjectName("pill")
+        head.addSpacing(6)
+        self.conn = pill("● Disconnected", "crit")
         head.addWidget(self.conn)
         self.port = label("", "sub")
         head.addWidget(self.port)
         head.addStretch()
         self.board_info = label("", "sub")
         head.addWidget(self.board_info)
+        self.theme_button = self.button("", lambda: self.set_theme("light" if self.theme_name == "dark" else "dark"),
+                                        "ghost", "Switch between the dark and light look")
+        head.addWidget(self.theme_button)
         root.addLayout(head)
-        self.logpath = label(f"Logging to {state.csv_path}", "muted")
-        self.logpath.setTextInteractionFlags(Qt.TextSelectableByMouse)
-        root.addWidget(self.logpath)
 
         cards = QHBoxLayout()
-        cards.setSpacing(14)
+        cards.setSpacing(16)
         self.local_card = BoardCard(self.theme, "base", "This board")
         self.remote_card = BoardCard(self.theme, "remote", "Remote board")
         cards.addWidget(self.local_card, 1)
@@ -625,11 +789,10 @@ class Window(QMainWindow):
         strip = QFrame()
         strip.setObjectName("strip")
         sl = QHBoxLayout(strip)
-        sl.setContentsMargins(16, 10, 16, 10)
-        sl.setSpacing(18)
+        sl.setContentsMargins(18, 10, 18, 10)
+        sl.setSpacing(20)
         sl.addWidget(label("Radio link", "section"))
-        self.link_pill = label("--", tone="dim")
-        self.link_pill.setObjectName("pill")
+        self.link_pill = pill("--")
         sl.addWidget(self.link_pill)
         self.link_metrics = []
         for _ in range(5):
@@ -640,11 +803,8 @@ class Window(QMainWindow):
         sl.addStretch()
         root.addWidget(strip)
 
-        bottom = QHBoxLayout()
-        bottom.setSpacing(14)
-        bottom.addWidget(self.build_controls(), 0)
-        bottom.addWidget(self.build_log(), 1)
-        root.addLayout(bottom)
+        root.addWidget(self.build_controls())
+        root.addWidget(self.build_log())
 
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
@@ -663,8 +823,8 @@ class Window(QMainWindow):
         c = QFrame()
         c.setObjectName("card")
         lay = QVBoxLayout(c)
-        lay.setContentsMargins(18, 14, 18, 16)
-        lay.setSpacing(10)
+        lay.setContentsMargins(22, 18, 22, 20)
+        lay.setSpacing(12)
         return c, lay
 
     def button(self, text, handler, kind=None, tip=None):
@@ -673,29 +833,41 @@ class Window(QMainWindow):
             b.setProperty("kind", kind)
         if tip:
             b.setToolTip(tip)
+        b.setCursor(Qt.PointingHandCursor)
         b.clicked.connect(handler)
         return b
 
-    def tab(self):
+    @staticmethod
+    def column():
+        lay = QVBoxLayout()
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(10)
+        return lay
+
+    def tab(self, *columns):
+        """A page with its columns side by side, a thin rule between them, each one top-aligned."""
         w = QWidget()
-        lay = QVBoxLayout(w)
-        lay.setContentsMargins(2, 12, 2, 2)
-        lay.setSpacing(8)
-        return w, lay
+        row = QHBoxLayout(w)
+        row.setContentsMargins(0, 0, 0, 0)
+        row.setSpacing(28)
+        for i, col in enumerate(columns):
+            if i:
+                rule = QFrame()
+                rule.setObjectName("vrule")
+                row.addWidget(rule)
+            col.addStretch()
+            row.addLayout(col, 1)
+        return w
 
     @staticmethod
     def combo(items, tip=None):
-        box = QComboBox()
-        box.addItems(items)
-        if tip:
-            box.setToolTip(tip)
-        return box
+        return make_combo(items, tip)
 
     @staticmethod
     def spin(lo, hi, tip=None):
         s = QSpinBox()
         s.setRange(lo, hi)
-        s.setButtonSymbols(QSpinBox.NoButtons)
+        s.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         if tip:
             s.setToolTip(tip)
         return s
@@ -712,45 +884,80 @@ class Window(QMainWindow):
         r.setObjectName("rule")
         return r
 
+    def info(self, title):
+        """A tinted box that explains what the settings above it do. Returns (box, its text label)."""
+        box = QFrame()
+        box.setObjectName("info")
+        lay = QVBoxLayout(box)
+        lay.setContentsMargins(14, 12, 14, 12)
+        lay.setSpacing(6)
+        lay.addWidget(label(title.upper(), "caps"))
+        text = self.note(role="sub")
+        lay.addWidget(text)
+        return box, text
+
     @staticmethod
-    def form(rows):
+    def actions(*widgets, left=None):
+        """A row of buttons on the right, with `left` (a widget or layout) at the left."""
+        row = QHBoxLayout()
+        row.setSpacing(8)
+        if isinstance(left, QWidget):
+            row.addWidget(left)
+        elif left is not None:
+            row.addLayout(left)
+        row.addStretch()
+        for w in widgets:
+            row.addWidget(w)
+        return row
+
+    FIELD_W = 210
+
+    def form(self, rows):
+        """Label on the left, a box of the same width on the right for every row."""
         grid = QGridLayout()
-        grid.setHorizontalSpacing(10)
-        grid.setVerticalSpacing(6)
+        grid.setHorizontalSpacing(12)
+        grid.setVerticalSpacing(8)
         for i, (text, widget, tip) in enumerate(rows):
             name = label(text)
             name.setToolTip(tip)
             widget.setToolTip(tip)
+            widget.setFixedWidth(self.FIELD_W)
             grid.addWidget(name, i, 0)
             grid.addWidget(widget, i, 1)
         grid.setColumnStretch(0, 1)
         return grid
 
+    def section(self, col, title, text=None):
+        col.addWidget(label(title, "section"))
+        if text:
+            col.addWidget(self.note(text))
+
     def build_controls(self):
         c, lay = self.card()
-        c.setFixedWidth(520)
         self.remote_buttons = []           # enabled only when the base is plugged in
-        self.tabs = QTabWidget()
-        self.tabs.setDocumentMode(True)
+        self.tabs = Tabs()
         self.tabs.addTab(self.build_sensor_tab(), "Sensor")
         self.tabs.addTab(self.build_radio_tab(), "Radio")
         self.tabs.addTab(self.build_timing_tab(), "Timing")
         self.tabs.addTab(self.build_boards_tab(), "Boards")
+        self.tabs.finish(label("Settings are kept by each board after a restart", "muted"))
         lay.addWidget(self.tabs)
-        lay.addStretch()
+        c.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Minimum)   # never squeezed: the page scrolls instead
         self.controls_built = True
         self.explain_sensor()
         self.explain_radio()
         return c
 
     def build_sensor_tab(self):
-        w, lay = self.tab()
+        left, right = self.column(), self.column()
+        self.section(left, "BMP280 sensor", "How each board's pressure and temperature sensor measures.")
         self.osrs_t = self.combo([f"×{n}" for n in OVERSAMPLING[1:]])
         self.osrs_p = self.combo([f"×{n}" for n in OVERSAMPLING[1:]])
         self.filter_box = self.combo(["Off"] + [f"×{n}" for n in FILTER_COEF[1:]])
         self.mode_box = self.combo(["Continuous", "One per reading"])
         self.standby_box = self.combo([f"{ms:g} ms" for ms in STANDBY_MS])
-        lay.addLayout(self.form([
+        self.sensor_target = self.combo(["Both boards", "This board", "Remote board"])
+        left.addLayout(self.form([
             ("Temperature oversampling", self.osrs_t,
              "Measurements averaged into each temperature value. The pressure is corrected with it."),
             ("Pressure oversampling", self.osrs_p, "Measurements averaged into each pressure value: finer, slower."),
@@ -759,38 +966,35 @@ class Window(QMainWindow):
             ("Measuring", self.mode_box,
              "Continuous: the chip measures on its own clock. One per reading: it sleeps until the board asks."),
             ("Rest between measurements", self.standby_box, "Continuous only: the pause after each measurement."),
+            ("Apply to", self.sensor_target, "Which board gets these settings"),
         ]))
         for box in (self.osrs_t, self.osrs_p, self.filter_box, self.mode_box, self.standby_box):
             box.currentIndexChanged.connect(self.explain_sensor)
-        self.sensor_explain = self.note(role="sub")
-        lay.addWidget(self.sensor_explain)
-        row = QHBoxLayout()
-        row.addWidget(label("Apply to"))
-        self.sensor_target = self.combo(["Both boards", "This board", "Remote board"])
-        row.addWidget(self.sensor_target)
-        row.addStretch()
-        row.addWidget(self.button("Defaults", lambda: self.set_sensor_controls(DEFAULT_SENSOR),
-                                  tip="Put the default settings in the boxes (not applied yet)"))
-        row.addWidget(self.button("Apply", self.apply_sensor, "primary"))
-        lay.addLayout(row)
-        self.sensor_now = self.note()
-        lay.addWidget(self.sensor_now)
-        self.sensor_result = self.note()
-        lay.addWidget(self.sensor_result)
-        lay.addStretch()
+        left.addSpacing(4)
+        left.addLayout(self.actions(
+            self.button("Defaults", lambda: self.set_sensor_controls(DEFAULT_SENSOR),
+                        tip="Put the default settings in the boxes (not applied yet)"),
+            self.button("Apply", self.apply_sensor, "primary")))
+        self.sensor_result = StatusLabel()
+        left.addWidget(self.sensor_result)
+
+        box, self.sensor_explain = self.info("What these settings do")
+        right.addWidget(box)
+        right.addWidget(label("Now on the boards", "section"))
+        self.sensor_now = StatusLabel("sub")
+        right.addWidget(self.sensor_now)
         self.set_sensor_controls(DEFAULT_SENSOR)
-        return w
+        return self.tab(left, right)
 
     def build_radio_tab(self):
-        w, lay = self.tab()
-        lay.addWidget(label("Link", "section"))
-        lay.addWidget(self.note("Both boards must use the same channel, rate and CRC, so these change on both: "
-                                "the remote confirms and switches, then the base follows. If they can't hear "
-                                "each other afterwards, both go back to the earlier settings on their own."))
+        left, right = self.column(), self.column()
+        self.section(left, "Link", "Both boards must use the same channel, rate and CRC, so these change on both: "
+                                   "the remote confirms and switches, then the base follows. If they can't hear "
+                                   "each other afterwards, both go back to the earlier settings on their own.")
         self.channel_spin = self.spin(0, 125)
         self.rate_box = self.combo(["250 kbps", "1 Mbps", "2 Mbps"])      # RF24 codes 2, 0, 1
         self.crc_box = self.combo(["16-bit", "8-bit"])                    # RF24 codes 2, 1
-        lay.addLayout(self.form([
+        left.addLayout(self.form([
             ("Channel", self.channel_spin, "Frequency = 2400 MHz + channel"),
             ("Data rate", self.rate_box, "Slower rates reach further"),
             ("Error check (CRC)", self.crc_box, "Checksum on every packet; damaged packets are dropped"),
@@ -798,31 +1002,31 @@ class Window(QMainWindow):
         for wdg in (self.channel_spin, self.rate_box, self.crc_box):
             sig = wdg.valueChanged if isinstance(wdg, QSpinBox) else wdg.currentIndexChanged
             sig.connect(self.explain_radio)
-        self.link_explain = self.note(role="sub")
-        lay.addWidget(self.link_explain)
-        row = QHBoxLayout()
-        row.addStretch()
-        row.addWidget(self.button("Defaults", lambda: self.set_link_controls(DEFAULT_LINK),
-                                  tip="Put the default settings in the boxes (not applied yet)"))
+        box, self.link_explain = self.info("On these settings")
+        left.addWidget(box)
         self.link_apply = self.button("Move both boards…", self.apply_link, "primary")
-        row.addWidget(self.link_apply)
-        lay.addLayout(row)
-        self.link_now = self.note()
-        lay.addWidget(self.link_now)
-        self.link_alert = self.note()
+        left.addLayout(self.actions(
+            self.button("Defaults", lambda: self.set_link_controls(DEFAULT_LINK),
+                        tip="Put the default settings in the boxes (not applied yet)"),
+            self.link_apply))
+        self.link_result = StatusLabel()
+        left.addWidget(self.link_result)
+        self.link_alert = StatusLabel()
         set_tone(self.link_alert, "warn")
-        lay.addWidget(self.link_alert)
-        self.link_result = self.note()
-        lay.addWidget(self.link_result)
+        left.addWidget(self.link_alert)
+        self.link_now = StatusLabel("sub")
+        left.addWidget(self.link_now)
 
-        lay.addWidget(self.rule())
-        lay.addWidget(label("Transmit power", "section"))
-        lay.addWidget(self.note("Per board. HIGH and MAX can deafen a receiver that is only a few metres away."))
+        self.section(right, "Transmit power",
+                     "Per board, as the nRF24 chip's output; the module's amplifier adds its gain on top. "
+                     "HIGH and MAX can deafen a receiver that is only a few metres away.")
         grid = QGridLayout()
-        grid.setHorizontalSpacing(10)
-        pa_items = [f"{n} ({PA_DBM[i]} + module)" for i, n in enumerate(PA_NAMES)]
+        grid.setHorizontalSpacing(8)
+        grid.setVerticalSpacing(8)
+        pa_items = [f"{n}  ·  {PA_DBM[i]}" for i, n in enumerate(PA_NAMES)]
         for i, (where, text) in enumerate((("L", "This board"), ("R", "Remote board"))):
-            box = self.combo(pa_items, "The nRF24's own output; the module's amplifier adds its gain on top")
+            box = self.combo(pa_items, "The nRF24 chip's own output; the module's amplifier adds its gain on top")
+            box.setFixedWidth(self.FIELD_W)
             set_pa = self.button("Set", lambda _=False, wh=where, b=box: self.apply_pa(wh, b.currentIndex()))
             grid.addWidget(label(text), i, 0)
             grid.addWidget(box, i, 1)
@@ -833,17 +1037,19 @@ class Window(QMainWindow):
                 self.remote_pa = box
                 self.remote_buttons += [box, set_pa]
         grid.setColumnStretch(0, 1)
-        lay.addLayout(grid)
-        self.pa_result = self.note()
-        lay.addWidget(self.pa_result)
+        right.addLayout(grid)
+        self.pa_result = StatusLabel()
+        right.addWidget(self.pa_result)
 
-        lay.addWidget(self.rule())
-        lay.addWidget(label("Remote's retries", "section"))
-        lay.addWidget(self.note("Only the remote transmits (the base just answers), so these are the remote's."))
+        right.addSpacing(6)
+        right.addWidget(self.rule())
+        right.addSpacing(6)
+        self.section(right, "Remote's retries",
+                     "Only the remote transmits (the base just answers), so these are the remote's.")
         self.ard_box = self.combo([f"{250 * (i + 1)} µs" for i in range(16)])
         self.arc_spin = self.spin(0, 15)
         self.attempts_spin = self.spin(1, 9)
-        lay.addLayout(self.form([
+        right.addLayout(self.form([
             ("Wait between tries", self.ard_box, "How long the radio waits for the base's reply before trying again"),
             ("Retries per send", self.arc_spin, "Automatic re-tries by the radio chip itself"),
             ("Sends per reading", self.attempts_spin,
@@ -853,59 +1059,54 @@ class Window(QMainWindow):
             sig = wdg.valueChanged if isinstance(wdg, QSpinBox) else wdg.currentIndexChanged
             sig.connect(self.explain_radio)
         self.retry_explain = self.note(role="sub")
-        lay.addWidget(self.retry_explain)
-        row = QHBoxLayout()
-        row.addStretch()
-        row.addWidget(self.button("Defaults", lambda: self.set_retry_controls(DEFAULT_RETRY),
-                                  tip="Put the default settings in the boxes (not applied yet)"))
+        right.addWidget(self.retry_explain)
         retry_apply = self.button("Apply", self.apply_retry, "primary")
-        row.addWidget(retry_apply)
-        lay.addLayout(row)
-        self.retry_now = self.note()
-        lay.addWidget(self.retry_now)
-        self.retry_result = self.note()
-        lay.addWidget(self.retry_result)
+        right.addLayout(self.actions(
+            self.button("Defaults", lambda: self.set_retry_controls(DEFAULT_RETRY),
+                        tip="Put the default settings in the boxes (not applied yet)"),
+            retry_apply))
+        self.retry_result = StatusLabel()
+        right.addWidget(self.retry_result)
+        self.retry_now = StatusLabel("sub")
+        right.addWidget(self.retry_now)
         self.remote_buttons += [self.link_apply, retry_apply]
         self.set_link_controls(DEFAULT_LINK)
         self.set_retry_controls(DEFAULT_RETRY)
-        return w
+        return self.tab(left, right)
 
     def build_timing_tab(self):
-        w, lay = self.tab()
-        grid = QGridLayout()
-        grid.setHorizontalSpacing(10)
-        grid.setVerticalSpacing(6)
-        grid.addWidget(label("Take a reading every"), 0, 0)
+        left, right = self.column(), self.column()
+        self.section(left, "Readings", "How often both boards measure, show and send a reading.")
         self.interval_spin = self.spin(200, 60000)
         self.interval_spin.setSingleStep(100)
         self.interval_spin.setSuffix(" ms")
         self.interval_spin.setValue(1000)
         self.interval_spin.valueChanged.connect(self.explain_sensor)
-        grid.addWidget(self.interval_spin, 0, 1)
-        grid.addWidget(self.button("Apply", lambda: self.apply_timing("interval"), "primary"), 0, 2)
+        self.interval_spin.setFixedWidth(self.FIELD_W)
+        left.addLayout(self.actions(self.interval_spin,
+                                    self.button("Apply", lambda: self.apply_timing("interval"), "primary"),
+                                    left=label("Take a reading every")))
         self.interval_now = label("", "muted")
-        grid.addWidget(self.interval_now, 1, 0, 1, 3)
-        grid.addWidget(label("Send a health report every"), 2, 0)
+        left.addWidget(self.interval_now)
+
+        self.section(right, "Health reports", "Supply voltages, radio and sensor counters, for the logs.")
         self.health_spin = self.spin(2, 60)
         self.health_spin.setSuffix(" s")
         self.health_spin.setValue(10)
-        grid.addWidget(self.health_spin, 2, 1)
+        self.health_spin.setFixedWidth(self.FIELD_W)
         self.health_apply = self.button("Apply", lambda: self.apply_timing("health"), "primary")
-        grid.addWidget(self.health_apply, 2, 2)
+        right.addLayout(self.actions(self.health_spin, self.health_apply, left=label("Send a health report every")))
         self.health_now = label("", "muted")
-        grid.addWidget(self.health_now, 3, 0, 1, 3)
-        grid.setColumnStretch(0, 1)
-        lay.addLayout(grid)
+        right.addWidget(self.health_now)
         self.timing_result = self.note("Applies to both boards, and each keeps it after a restart.")
-        lay.addWidget(self.timing_result)
-        lay.addStretch()
-        return w
+        left.addWidget(self.timing_result)
+        return self.tab(left, right)
 
     def build_boards_tab(self):
-        w, lay = self.tab()
+        cols = []
         for where, title in (("R", "Remote board"), ("L", "This board")):
-            lay.addWidget(label(title, "section"))
-            row1, row2 = QHBoxLayout(), QHBoxLayout()
+            col = self.column()
+            self.section(col, title, "Through the base, by radio." if where == "R" else "On USB.")
             pre = "remote " if where == "R" else ""
             btns = []
             if where == "R":
@@ -917,35 +1118,43 @@ class Window(QMainWindow):
             if where == "L":
                 btns.append(self.button("Wiring check", lambda: self.send("diag"),
                                         tip="Measures the I2C and radio lines; results appear in the log"))
+            row = QHBoxLayout()
+            row.setSpacing(8)
             for b in btns:
-                row1.addWidget(b)
-            row1.addStretch()
-            row2.addStretch()
+                row.addWidget(b)
+            row.addStretch()
+            col.addLayout(row)
             reset = self.button("Restart board…", lambda _=False, wh=where: self.reset(wh), "danger")
-            row2.addWidget(reset)
-            lay.addLayout(row1)
-            lay.addLayout(row2)
+            col.addLayout(self.actions(reset))
             if where == "R":
                 self.remote_buttons += btns + [reset]
-        lay.addStretch()
-        return w
+            cols.append(col)
+        return self.tab(*cols)
 
     def build_log(self):
         c, lay = self.card()
         hl = QHBoxLayout()
+        hl.setSpacing(12)
         hl.addWidget(label("Log", "section"))
         hl.addStretch()
-        hl.addWidget(label("Everything the board prints is also saved to serial_*.log", "muted"))
+        self.logpath = label(f"Readings go to {self.state.csv_path}; everything the board prints to serial_*.log",
+                             "muted")
+        self.logpath.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        hl.addWidget(self.logpath)
+        self.clear_log = self.button("Clear", self.log_clear, "ghost",
+                                     "Empty this view. The log files on disk keep everything.")
+        hl.addWidget(self.clear_log)
         lay.addLayout(hl)
         self.log = QPlainTextEdit()
         self.log.setReadOnly(True)
         self.log.setMaximumBlockCount(2000)
-        self.log.setMinimumHeight(240)
+        self.log.setMinimumHeight(220)
         lay.addWidget(self.log, 1)
-        row = QHBoxLayout()
         self.cmd = QLineEdit()
         self.cmd.setPlaceholderText("Type a firmware command, e.g. status, help, remote ping")
         self.cmd.returnPressed.connect(self.send_typed)
+        row = QHBoxLayout()
+        row.setSpacing(8)
         row.addWidget(self.cmd, 1)
         row.addWidget(self.button("Send", self.send_typed))
         lay.addLayout(row)
@@ -953,6 +1162,7 @@ class Window(QMainWindow):
 
     def apply_theme(self):
         self.setStyleSheet(qss(self.theme))
+        self.theme_button.setText("☀ Light" if self.theme_name == "dark" else "☾ Dark")
         for card in (self.local_card, self.remote_card):
             card.retheme(self.theme)
 
@@ -1025,6 +1235,9 @@ class Window(QMainWindow):
             name = text.split()[1].lower()
             self.remote_busy = (name, now)
             self.awaiting = ("R", name, now)
+
+    def log_clear(self):
+        self.log.clear()
 
     def send_typed(self):
         text = self.cmd.text().strip()

@@ -35,7 +35,9 @@ python3 host/weather_gui.py     # auto-detects the port; or --port /dev/ttyACM0;
 
 Same serial reader and the same logs as the terminal UI below, in a window: each board's reading with a
 history chart (temperature or pressure, last 5 min to 24 hours; hover for values), its health report, the radio
-link, a log with a command line, and buttons for every command. The controls are in four tabs:
+link, a log with a command line (**Clear** empties the view; the log files keep everything), and buttons for
+every command. The button at the top right switches between the dark and light look. The settings are in four
+tabs, each laid out in two columns:
 
 - **Sensor:** the BMP280's oversampling, smoothing filter, mode (continuous, or one measurement per reading)
   and rest time, applied to both boards, this board or the remote. A live explanation says what the settings
