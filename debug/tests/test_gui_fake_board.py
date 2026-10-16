@@ -75,9 +75,11 @@ def main():
     got = b""
     win.health_apply.click()
     pump(0.5)
-    checks.append(("Apply sends health 30000 to both boards",
-                   b"health 30000\n" in got and b"remote health 30000\n" in got))
-    board("CMD,L,0,health,OK", "CMD,R,5,health,QUEUED")
+    first, got = got, b""
+    board("CMD,L,0,health,OK")
+    checks.append(("Apply sends health 30000 to both boards, the remote's after this board answered",
+                   first == b"health 30000\n" and got == b"remote health 30000\n"))
+    board("CMD,R,5,health,QUEUED")
     checks.append(("waits while the remote's command is queued", "Waiting" in win.timing_result.text()))
     board("CMD,R,5,health,OK", "STAT,BASE,1,1,6000,3,1,1000,UPLOAD ,30000",
           "HEALTH,R,8,100000,4598,3288,36.0,2,1,0,30,42,0,85,5350")
@@ -105,7 +107,9 @@ def main():
         win.set_theme("dark")
 
     win.apply_timing("health")
-    board("CMD,L,0,health,OK", "CMD,R,6,health,UNKNOWN")
+    pump(0.3)
+    board("CMD,L,0,health,OK")
+    board("CMD,R,6,health,UNKNOWN")
     checks.append(("explains an older remote firmware", "upload the new firmware" in win.timing_result.text()))
 
     board("STAT,BASE,1,1,7000,3,1,1000,UPLOAD ")    # firmware from before the health command

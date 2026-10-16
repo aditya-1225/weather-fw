@@ -100,8 +100,10 @@ def main():
     sent()
     win.apply_sensor()
     pump(0.4)
-    checks.append(("Apply sends bmp 15010 to both", sent() == ["bmp 15010", "remote bmp 15010"]))
-    board("CMD,L,0,bmp,OK", "CMD,R,6,bmp,QUEUED")
+    checks.append(("Apply sends bmp 15010 to this board first", sent() == ["bmp 15010"]))
+    board("CMD,L,0,bmp,OK")
+    checks.append(("and the remote's once this board has answered", sent() == ["remote bmp 15010"]))
+    board("CMD,R,6,bmp,QUEUED")
     checks.append(("waits for the remote", "Waiting" in win.sensor_result.text()))
     board("CMD,R,6,bmp,OK")
     checks.append(("confirms both", win.sensor_result.text() == "✓ Applied on both boards."))
@@ -115,6 +117,17 @@ def main():
     checks.append(("explains a sensor that didn't keep the settings",
                    "didn't keep the settings" in win.sensor_result.text()
                    and win.sensor_result.property("tone") == "crit"))
+
+    # A base that never answers (older firmware prints its help instead) doesn't hold up the queue for good
+    win.sensor_target.setCurrentIndex(0)
+    win.apply_sensor()
+    pump(1.0)
+    first = sent()
+    pump(1.6)
+    checks += [("no answer: the remote's command waits", first == ["bmp 15010"]),
+               ("and goes after the answer wait", sent() == ["remote bmp 15010"])]
+    board("CMD,R,7,bmp,QUEUED", "CMD,R,7,bmp,OK")
+    win.pending.pop("sensor", None)
 
     # Remote commands one at a time
     win.set_retry_controls(weather_gui.Retry(12, 15, 5))

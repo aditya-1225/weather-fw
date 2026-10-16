@@ -32,6 +32,8 @@ from weather_settings import (DEFAULT_LINK, DEFAULT_RETRY, DEFAULT_SENSOR, FILTE
 from weather_ui import PA_NAMES, State, SerialLink, num, uptime
 
 HISTORY_S = 24 * 3600           # readings kept for the charts
+ANSWER_WAIT_S = 2.0             # longest wait for the base to answer a command line before sending the next
+LINE_GAP_S = 0.2                # and the pause after its answer
 SPANS = [("5 min", 300), ("15 min", 900), ("1 hour", 3600), ("2 hours", 7200), ("6 hours", 21600),
          ("24 hours", 86400)]
 
@@ -579,7 +581,10 @@ class Window(QMainWindow):
         self.log_seen = 0
         self.synced = set()          # settings boxes already filled from the boards
         self.pending = {}            # control name -> (time sent, [(where, cmd name)], label for the answer)
+        self.outbox = []             # this board's commands waiting for the line before to be answered
         self.remote_queue = []       # remote commands waiting for the one before to finish
+        self.awaiting = None         # (L or R, cmd name, time sent) of the line the base hasn't answered yet
+        self.answered = 0.0          # when it last answered
         self.remote_busy = None      # (cmd name, time sent) of the remote command the base is working on
         # the last 24 h from earlier runs' logs; goes into the charts once we know which board is plugged in
         self.past = load_history(os.path.dirname(state.csv_path), state.csv_path, time.time() - HISTORY_S)
@@ -960,18 +965,25 @@ class Window(QMainWindow):
         self.link.send(text)
 
     def command(self, text):
-        """A board command; the remote's go through the queue."""
+        """A board command; the remote's go through their own queue."""
         if text.startswith("remote "):
             self.send_remote(text)
         else:
-            self.send(text)
+            self.send_local(text)
+
+    def send_local(self, text):
+        self.outbox.append(text)
+        self.pump_now()
 
     def send_remote(self, text):
         """The base holds one remote command at a time and a newer one replaces it, so send them one by one."""
         self.remote_queue.append(text)
+        self.pump_now()
+
+    def pump_now(self):
         with self.state.lock:
             commands = dict(self.state.commands)
-        self.pump_remote(commands)
+        self.pump(commands)
 
     def remote_timeout(self):
         """How long the base keeps trying a remote command (its own limit), plus a little."""
@@ -979,17 +991,40 @@ class Window(QMainWindow):
             every = num(self.state.link.get("remote_interval", ""), int) or 1000
         return max(30, 20 * every / 1000 + 5) + 5
 
-    def pump_remote(self, commands):
+    def pump(self, commands):
+        """Send the next queued command, one line at a time: the next goes only once the base has answered the
+        one before (CMD,L, or CMD,R,…,QUEUED) or ANSWER_WAIT_S has passed. Sent back to back, a line could
+        arrive garbled: after `bmp` moved the base from one per reading to continuous, a `remote bmp` straight
+        after came out as "not a command"."""
+        now = time.time()
+        if self.awaiting:
+            where, name, sent = self.awaiting
+            r = commands.get((where, name))
+            if r and r[1] >= sent:
+                self.awaiting, self.answered = None, r[1]
+            elif now - sent < ANSWER_WAIT_S:
+                return
+            else:
+                self.awaiting, self.answered = None, now
+        if now - self.answered < LINE_GAP_S:
+            return
+        if self.outbox:
+            text = self.outbox.pop(0)
+            self.send(text)
+            self.awaiting = ("L", text.split()[0].lower(), now)
+            return
         if self.remote_busy:
             name, sent = self.remote_busy
             r = commands.get(("R", name))
-            if not (r and r[1] >= sent and r[0] != "QUEUED") and time.time() - sent < self.remote_timeout():
+            if not (r and r[1] >= sent and r[0] != "QUEUED") and now - sent < self.remote_timeout():
                 return
             self.remote_busy = None
         if self.remote_queue:
             text = self.remote_queue.pop(0)
             self.send(text)
-            self.remote_busy = (text.split()[1], time.time())
+            name = text.split()[1].lower()
+            self.remote_busy = (name, now)
+            self.awaiting = ("R", name, now)
 
     def send_typed(self):
         text = self.cmd.text().strip()
@@ -1007,7 +1042,7 @@ class Window(QMainWindow):
         """Send `name arg` to this board and/or the remote, and report their answers in `out`."""
         targets = []
         if local:
-            self.send(f"{name} {arg}")
+            self.send_local(f"{name} {arg}")
             targets.append(("L", name))
         if remote and self.state.role == "BASE":
             self.send_remote(f"remote {name} {arg}")
@@ -1163,7 +1198,7 @@ class Window(QMainWindow):
         self.sync_controls(st, link)
         self.update_settings(role, st, link)
         self.update_pending(commands)
-        self.pump_remote(commands)
+        self.pump(commands)
 
         new = total - self.log_seen
         if new > 0:

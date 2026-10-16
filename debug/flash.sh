@@ -3,10 +3,14 @@
 # today's uploads needed (avrdude sometimes hangs at "jtagmkII_getsync()").
 #
 #   debug/flash.sh base                       # weather firmware, BASE role
-#   debug/flash.sh remote --pa max            # REMOTE role, starting at PA MAX
+#   debug/flash.sh remote --pa max            # REMOTE role, starting at PA MAX (see below)
 #   debug/flash.sh debug/sketches/radiodiag   # any sketch folder
 #   ... --board 2CF4 | --port /dev/ttyACM1    # pick a board (default: the only one plugged in)
 #   ... --no-upload                           # compile only
+#
+# --pa only applies to a board with no saved settings: the firmware keeps its
+# settings (PA included) in EEPROM, and a re-upload doesn't erase them. Use
+# `pa <0-3>` (or `remote pa <0-3>`) to change a board that has some.
 #
 # Close weather_ui.py / Serial Monitor first: only one program can have the port.
 set -u
@@ -16,7 +20,7 @@ FLATPAK_CLI=/var/lib/flatpak/app/cc.arduino.IDE2/current/active/files/arduino-id
 CLI=${ARDUINO_CLI:-$( [ -x "$FLATPAK_CLI" ] && echo "$FLATPAK_CLI" || command -v arduino-cli )}
 FQBN=arduino:megaavr:nona4809:mode=off
 
-usage() { sed -n '2,11p' "$0" | sed 's/^# \{0,1\}//'; exit 1; }
+usage() { sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'; exit 1; }
 [ $# -ge 1 ] || usage
 [ -n "$CLI" ] || { echo "arduino-cli not found (set ARDUINO_CLI=/path/to/arduino-cli)"; exit 1; }
 
