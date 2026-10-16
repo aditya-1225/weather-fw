@@ -129,7 +129,7 @@ class State:
             elif kind == "LINK" and len(parts) >= 2:
                 keys = ["up", "rx", "lost", "strong", "arc", "remote_tx_fails",
                         "remote_inits", "remote_pa", "remote_interval", "remote_reset", "repeats",
-                        "remote_bmp", "remote_retry"]
+                        "remote_bmp", "remote_retry", "remote_searching"]
                 self.link.update(dict(zip(keys, parts[1:])))
                 self.link["time"] = now
             elif kind == "TX" and len(parts) >= 6:

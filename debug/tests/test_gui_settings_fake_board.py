@@ -172,7 +172,10 @@ def main():
     checks.append(("explains a link change that didn't work",
                    "couldn't reach the base on the new settings" in win.link_result.text()))
 
-    board(STAT.format(bmp=15010, retry=10154, link=9002, prev=10822, search=1), LINK.format(up=0, rbmp=35301, rretry=8103))
+    board(STAT.format(bmp=15010, retry=10154, link=9002, prev=10822, search=0), LINK.format(up=1, rbmp=35301, rretry="8103,1"))
+    checks += [("a remote that can't hear the base shows as one way", win.link_pill.text() == "⚠ One way"),
+               ("and is explained", "can't hear this board's replies" in win.link_alert.text())]
+    board(STAT.format(bmp=15010, retry=10154, link=9002, prev=10822, search=1), LINK.format(up=0, rbmp=35301, rretry="8103,0"))
     checks += [("searching shows in the link strip", win.link_pill.text() == "⚠ Searching"),
                ("and under the link settings", "trying the link settings it knows" in win.link_alert.text())]
 

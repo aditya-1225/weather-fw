@@ -144,6 +144,8 @@ struct __attribute__((packed)) DataPacket {   // remote -> base, 32 bytes (28 be
   uint8_t  attempts;
 };
 const uint8_t DATA_V1_LEN = 28;   // a remote with the older firmware sends no settings fields
+// Top bit of DataPacket.sensorBits: the remote is searching, so it isn't hearing the base's ACKs.
+const uint16_t SENSOR_BITS_SEARCHING = 0x8000;
 
 struct __attribute__((packed)) AckPacket {    // base -> remote, inside ACK
   uint8_t type;
@@ -243,6 +245,9 @@ uint32_t lastRxMs = 0, lastRecoverMs = 0, rxCount = 0, lostCount = 0, badPackets
 uint16_t recoverAttempts = 0;
 DataPacket lastRemote;
 bool     switchAfterRx = false;          // the remote confirmed a link change: follow it once the packet is handled
+uint32_t deafSinceMs = 0, deafLastMs = 0; // hearing a remote that says it can't hear us, since / last time
+bool     searchNow = false;              // ...for long enough: search without waiting for the quiet time
+const uint32_t REMOTE_DEAF_MS = 3000;
 LinkCfg  switchTo;
 #else
 uint32_t txOk = 0;
@@ -256,6 +261,7 @@ uint8_t  switchFails = 0;
 uint8_t  switchSeq = 0;                  // the base's command number for it (0 = typed here)
 uint8_t  linkCmdSeq = 0;                 // command that switched the link, until an ACK proves it works
 uint32_t lastProbeMs = 0;
+bool     foundPending = false;           // a search ended on an ACK: tell the base (announceFound)
 #endif
 
 // ----------------------------------------------------------------- helpers --
@@ -640,6 +646,9 @@ void switchLink(const LinkCfg &to) {
 // A packet (base) or an ACK (remote) came through on radioLink.
 void linkHeard() {
   quietSinceMs = millis();
+#if !IS_BASE
+  if (searching) foundPending = true;
+#endif
   bool moved = searching && !sameLink(radioLink, linkCfg);
   if (searching && !moved) logMsg(F("link found again on the same settings"));
   searching = false;
@@ -666,14 +675,25 @@ void linkHeard() {
 void searchTask(uint32_t now, uint32_t dwellMs) {
   LinkCfg c[3];
   uint8_t n = linkCandidates(c);
-  if (n < 2 || elapsed(quietSinceMs, now) < searchAfterMs()) return;
+#if IS_BASE
+  bool rightAway = searchNow;
+  searchNow = false;
+#else
+  const bool rightAway = false;
+#endif
+  if (n < 2) return;
   if (!searching) {
+    if (!rightAway && elapsed(quietSinceMs, now) < searchAfterMs()) return;
     searching = true;
     searchIdx = 0;                          // the current settings: stay on them for the first step
     searchStepMs = now;
-    Serial.print(F("LOG,nothing heard for "));
-    Serial.print(elapsed(quietSinceMs, now) / 1000);
-    Serial.print(F(" s, searching "));
+    if (rightAway) {
+      Serial.print(F("LOG,the remote can't hear us, searching "));
+    } else {
+      Serial.print(F("LOG,nothing heard for "));
+      Serial.print(elapsed(quietSinceMs, now) / 1000);
+      Serial.print(F(" s, searching "));
+    }
     Serial.print(n);
     Serial.println(F(" link settings"));
     printStatus();
@@ -1123,13 +1143,24 @@ void checkCmdDone(const DataPacket &p) {
   }
 }
 
+// A remote that says it is searching isn't hearing our ACKs: the link works one way only.
+// Its packets don't count as the link found (we'd stay on settings it can't use, while
+// it keeps cycling through the others), and if it goes on, we search too.
+void remoteCantHearUs(uint32_t now) {
+  if (elapsed(deafLastMs, now) > 2000) deafSinceMs = now;    // a new stretch (probes come every 300 ms)
+  deafLastMs = now;
+  if (!searching && elapsed(deafSinceMs, now) >= REMOTE_DEAF_MS) searchNow = true;
+}
+
 void handleRemotePacket(const DataPacket &p, bool hasCfg, bool strongSignal) {
   if (p.type != PKT_DATA || p.ver != PROTO_VER) {
     badPackets++;
     return;
   }
   uint32_t now = millis();
-  linkHeard();
+  bool remoteSearching = hasCfg && (p.sensorBits & SENSOR_BITS_SEARCHING);
+  if (remoteSearching) remoteCantHearUs(now);
+  else linkHeard();
   // The remote re-sends a reading when it misses our ACK, but we usually got the
   // first copy. Count it as a sign of life and a command confirmation only.
   if (heardRemote && p.seq == lastRemote.seq && p.uptimeMs == lastRemote.uptimeMs) {
@@ -1189,9 +1220,10 @@ void handleRemotePacket(const DataPacket &p, bool hasCfg, bool strongSignal) {
     SensorCfg s = {uint8_t(b & 7), uint8_t(b >> 3 & 7), uint8_t(b >> 6 & 7), uint8_t(b >> 9 & 7), uint8_t(b >> 12 & 1)};
     RetryCfg r = {uint8_t(p.retryBits >> 4), uint8_t(p.retryBits & 15), p.attempts};
     Serial.print(sensorCode(s)); Serial.print(',');
-    Serial.println(retryCode(r));
+    Serial.print(retryCode(r));   Serial.print(',');
+    Serial.println(remoteSearching);
   } else {
-    Serial.println(F("-,-"));                  // older remote firmware
+    Serial.println(F("-,-,-"));                // older remote firmware
   }
 }
 
@@ -1320,7 +1352,8 @@ bool radioSend(const void *buf, uint8_t len, uint8_t &attempts, AckPacket &ack, 
 }
 
 void remoteSendHealth(const HealthPacket &h) {
-  if (!radioOk) return;
+  // Not while searching: the health packet can't say so, and the base would take it as the link found.
+  if (!radioOk || searching) return;
   uint8_t attempts;
   AckPacket ack;
   bool gotAck;
@@ -1333,11 +1366,27 @@ void remoteSendHealth(const HealthPacket &h) {
 void remoteProbe(uint32_t now) {
   if (!searching || !haveSent || !radioOk || elapsed(lastProbeMs, now) < PROBE_MS) return;
   lastProbeMs = now;
+  lastSent.sensorBits |= SENSOR_BITS_SEARCHING;
   uint8_t attempts;
   AckPacket ack;
   bool gotAck;
   if (radioSend(&lastSent, sizeof lastSent, attempts, ack, gotAck)) linkHeard();
+  announceFound();
   if (gotAck) handleAck(ack);
+}
+
+// The search just ended on an ACK, but the packet that got it still said "searching", and
+// the base doesn't settle while we say that. Re-send it without the flag straight away,
+// before the base's own search moves it on. The base takes it as a repeat of the reading.
+void announceFound() {
+  if (!foundPending) return;
+  foundPending = false;
+  if (!haveSent) return;
+  lastSent.sensorBits &= ~SENSOR_BITS_SEARCHING;
+  uint8_t attempts;
+  AckPacket ack;
+  bool gotAck;
+  radioSend(&lastSent, sizeof lastSent, attempts, ack, gotAck);   // a command in this ACK comes again
 }
 
 void remoteTransmit() {
@@ -1363,6 +1412,7 @@ void remoteTransmit() {
                | sensorCfg.forced << 12;
   p.retryBits  = retryCfg.delay << 4 | retryCfg.count;
   p.attempts   = retryCfg.attempts;
+  if (searching) p.sensorBits |= SENSOR_BITS_SEARCHING;
   lastSent = p;
   haveSent = true;
 
@@ -1396,6 +1446,7 @@ void remoteTransmit() {
   Serial.print(radioInits);  Serial.print(',');
   Serial.println(attempts);
 
+  announceFound();
   if (gotAck) handleAck(ack);   // after the radio is idle; may re-init or reset it
 
   if (consecutiveFails >= REMOTE_FAILS_BEFORE_REINIT && !searching) {

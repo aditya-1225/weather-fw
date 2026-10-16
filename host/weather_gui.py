@@ -1222,8 +1222,10 @@ class Window(QMainWindow):
         searching = st.get("searching") == "1"
         if role == "BASE" and link:
             up = link.get("up") == "1"
-            self.link_pill.setText("Up" if up else "⚠ Searching" if searching else "⚠ Down")
-            set_tone(self.link_pill, "good" if up else "crit")
+            one_way = up and link.get("remote_searching") == "1"
+            self.link_pill.setText("⚠ One way" if one_way else "Up" if up else "⚠ Searching" if searching
+                                   else "⚠ Down")
+            set_tone(self.link_pill, "warn" if one_way else "good" if up else "crit")
             rx, lost = num(link.get("rx", ""), int) or 0, num(link.get("lost", ""), int) or 0
             loss = 100.0 * lost / (rx + lost) if rx + lost else 0.0
             sig = {"1": "strong", "0": "weak"}.get(link.get("strong"), "--")
@@ -1313,6 +1315,9 @@ class Window(QMainWindow):
         if st.get("searching") == "1":
             alerts.append("⚠ This board hears nothing and is trying the link settings it knows "
                           "(now, before that, defaults).")
+        elif role == "BASE" and link.get("up") == "1" and link.get("remote_searching") == "1":
+            alerts.append("⚠ The remote's readings arrive, but it can't hear this board's replies, so it is trying "
+                          "the link settings it knows. If that goes on, this board searches too.")
         if old_remote:
             alerts.append("⚠ The remote has the older firmware: upload the new one before moving the link.")
         self.link_alert.setText("\n".join(alerts))

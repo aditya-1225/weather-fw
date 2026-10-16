@@ -11,7 +11,7 @@ Give the desktop GUI (`host/weather_gui.py`) control over the BMP280's oversampl
 | Base board (B800, on USB) | **Flashed with the new firmware** (built with `--pa max`). Settings now: sensor `25410` (the default: temp ×2, pressure ×16, filter ×16, continuous, 62.5 ms rest), interval 1000 ms, PA MAX, link channel 108 / 250 kbps / CRC 16. |
 | Remote board (2CF4) | **Not flashed. Still on the old firmware.** Linked over radio, 200 ms interval, PA MAX. It answers the new commands with `UNKNOWN`, as expected. |
 | Open bug | One known bug in how the base reads commands (below). The GUI no longer triggers it (follow-up, below); the firmware cause is still unknown. |
-| Tests | 99 checks across 6 test files, all passing (no hardware needed). |
+| Tests | 101 checks across 6 test files, all passing (no hardware needed). |
 
 ## What was checked first
 
@@ -80,6 +80,14 @@ If the base is in **one-per-reading mode** and receives a command switching it b
 - Tests updated for the new order: `test_gui_settings_fake_board.py` now has 31 checks (new: the remote half waits for this board's answer, and goes anyway once the answer wait runs out); `test_gui_fake_board.py` still 16.
 - The firmware cause is **not** found: it needs the board's `LOG,not a command: '…'` output (rerun `burst4.py`), which this session couldn't capture. Reading the code found nothing in the line reader itself (no re-entry, no buffer overflow, `strtok` restarted per line). The README now tells other scripts to wait for each `CMD` answer too.
 - Docs done: README (Sensor/Radio tabs, settings codes, EEPROM persistence, link changes and the search, STAT/LINK fields, one-line-at-a-time rule) and the `--pa` note in `debug/flash.sh`.
+
+### Follow-up: one-way link (2026-10-16, after flashing the remote)
+
+- Moving to channel 80 failed cleanly: neither board heard the other there, both searched and met on 108 again after about 23 s. Most likely something strong near 2480 MHz where the boards are.
+- On channel 90 the link went up and down for minutes. The link-up times came every 18-21 s, which matches the remote cycling through its 3 link settings (6 s each): the base heard the remote while it was on 90, but the remote didn't hear the base's ACKs there, so it never stopped searching. The base took the remote's packets as "link found" and stayed on 90, so they never met on 108, which works both ways. A `remote link` sent then timed out, as it rides on those ACKs.
+- **Fix (firmware, both boards):** the remote marks its packets while it searches (top bit of `sensorBits`). The base doesn't count marked packets as the link found, and after 3 s of them it searches too. When the remote's search ends on an ACK it re-sends the reading unmarked at once, so the base settles on the same settings. No health packets while searching (they can't carry the mark). `LINK` gains `r_searching`; the GUI shows "⚠ One way" and explains it in the Radio tab.
+- Compiled for both roles with avr-gcc 14 and the megaAVR core and libraries from GitHub (no warnings); not run on the boards yet. Needs flashing on both.
+- Still open: the GUI says "✓ The remote confirmed and switched" even when the change doesn't hold (the base clears the command on the remote's OK, so the later `FAILED` never reaches it).
 
 ## Not done yet
 

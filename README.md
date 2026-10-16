@@ -178,7 +178,7 @@ The base's serial is the source of truth. The UI only parses these lines:
 ```
 DATA,L|R,seq,uptime_ms,temp_c,pressure_pa,sensor_ok           L = this board, R = remote (base only)
 LINK,up,rx,lost,strong,arc,r_tx_fails,r_radio_inits,r_pa,r_interval_ms,r_reset_cause,repeats,
-     r_bmp,r_retry                                                                       (base)
+     r_bmp,r_retry,r_searching                                                           (base)
 TX,ok,arc,tx_ok,tx_fails,radio_inits,attempts                                           (remote)
 STAT,role,radio_ok,sensor_ok,uptime_ms,radio_inits,pa,interval_ms,reset_cause,health_ms,
      bmp,retry,link,prev_link,searching
@@ -207,8 +207,9 @@ The settings fields at the end of `STAT` and `LINK` use the same codes as the co
 
 - `STAT`: `bmp`, `retry` and `link` are this board's settings, `prev_link` the link before the last change
   (tried while searching), `searching` 1 while the board is looking for the other one.
-- `LINK`: `r_bmp`, `r_retry` are the remote's sensor and retry settings. A remote with firmware from before
-  these commands sends a shorter packet, and the base prints `-,-` for them.
+- `LINK`: `r_bmp`, `r_retry` are the remote's sensor and retry settings, `r_searching` 1 while the remote is
+  searching (it isn't hearing the base). A remote with firmware from before these commands sends a shorter
+  packet, and the base prints `-,-,-` for them.
 
 New fields always go at the end of a line, so older parsers keep working.
 
@@ -257,7 +258,12 @@ board, which then can't hear the other.
 If either board hears nothing for max(15 s, 3 readings + 5 s), it searches: it cycles through the link
 settings it knows, the current ones, the previous ones and the defaults. The base stays 1.5 s on each; the
 remote stays 6 s on each and sends a probe every 300 ms. The settings they meet on become the current ones.
-If a link change caused it, the remote reports that command to the base as `FAILED`. The pipe address
+If a link change caused it, the remote reports that command to the base as `FAILED`.
+
+A link can also work one way only: the base hears the remote, but the remote doesn't hear the base's ACKs.
+The remote then searches, and marks its packets as searching. The base doesn't take those packets as the
+link found, and after 3 s of them it searches too, until both meet on settings that work both ways. The GUI
+shows this as "⚠ One way". The pipe address
 (`PIPE_ADDR`) can only be changed in the sketch, on both boards.
 
 Other radio settings: auto-ack with ACK payloads.
