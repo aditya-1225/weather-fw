@@ -23,10 +23,11 @@ import time
 from bisect import bisect_left
 
 from PySide6.QtCore import QPointF, QRectF, Qt, QTimer
-from PySide6.QtGui import QColor, QFont, QFontDatabase, QGuiApplication, QPainter, QPainterPath, QPen
+from PySide6.QtGui import (QColor, QFont, QFontDatabase, QGuiApplication, QKeySequence, QPainter, QPainterPath,
+                           QPen, QShortcut)
 from PySide6.QtWidgets import (QApplication, QButtonGroup, QComboBox, QFrame, QGridLayout, QHBoxLayout,
                                QLabel, QLineEdit, QMainWindow, QMessageBox, QPlainTextEdit, QPushButton,
-                               QScrollArea, QSizePolicy, QSpinBox, QVBoxLayout, QWidget)
+                               QSizePolicy, QSpinBox, QStackedWidget, QVBoxLayout, QWidget)
 
 from weather_settings import (DEFAULT_LINK, DEFAULT_RETRY, DEFAULT_SENSOR, FILTER_COEF, OVERSAMPLING, PA_DBM,
                               STANDBY_MS, Link, Retry, Sensor)
@@ -86,7 +87,7 @@ def qss(t):
                     for k in ("good", "warn", "crit"))
     return f"""
     QWidget {{ color: {t['text']}; font-size: 13px; }}
-    QMainWindow, QScrollArea, #page {{ background: {t['bg']}; }}
+    QMainWindow, #page {{ background: {t['bg']}; }}
     QFrame#card {{ background: {t['surface']}; border: 1px solid {t['line']}; border-radius: 14px; }}
     QFrame#strip {{ background: {t['surface']}; border: 1px solid {t['line']}; border-radius: 12px; }}
     QFrame#tile {{ background: {t['raised']}; border-radius: 10px; }}
@@ -254,7 +255,7 @@ class Tabs(QWidget):
         lay.addLayout(self.bar_row)
         self.body = QVBoxLayout()
         self.body.setContentsMargins(0, 0, 0, 0)
-        lay.addLayout(self.body)
+        lay.addLayout(self.body, 1)
         self.bar = None
 
     def addTab(self, page, name):
@@ -753,7 +754,7 @@ class Window(QMainWindow):
         # the last 24 h from earlier runs' logs; goes into the charts once we know which board is plugged in
         self.past = load_history(os.path.dirname(state.csv_path), state.csv_path, time.time() - HISTORY_S)
         self.setWindowTitle("Weather link")
-        self.resize(1400, 1000)
+        self.resize(1400, 960)
 
         page = QWidget()
         page.setObjectName("page")
@@ -761,30 +762,32 @@ class Window(QMainWindow):
         root.setContentsMargins(20, 16, 20, 20)
         root.setSpacing(14)
 
-        # header
+        # header: who's connected on the left, the two views in the middle, the board and the look on the right
         head = QHBoxLayout()
         head.setSpacing(10)
-        head.addWidget(label("Weather link", "app"))
-        head.addSpacing(6)
+        left = QHBoxLayout()
+        left.setSpacing(10)
+        left.addWidget(label("Weather link", "app"))
+        left.addSpacing(6)
         self.conn = pill("● Disconnected", "crit")
-        head.addWidget(self.conn)
+        left.addWidget(self.conn)
         self.port = label("", "sub")
-        head.addWidget(self.port)
-        head.addStretch()
+        left.addWidget(self.port)
+        left.addStretch()
+        head.addLayout(left, 1)
+        self.view_switch = Segmented(["Data", "Control"], self.show_view)
+        self.view_switch.setToolTip("Ctrl+1 / Ctrl+2")
+        head.addWidget(self.view_switch)
+        right = QHBoxLayout()
+        right.setSpacing(10)
+        right.addStretch()
         self.board_info = label("", "sub")
-        head.addWidget(self.board_info)
+        right.addWidget(self.board_info)
         self.theme_button = self.button("", lambda: self.set_theme("light" if self.theme_name == "dark" else "dark"),
                                         "ghost", "Switch between the dark and light look")
-        head.addWidget(self.theme_button)
+        right.addWidget(self.theme_button)
+        head.addLayout(right, 1)
         root.addLayout(head)
-
-        cards = QHBoxLayout()
-        cards.setSpacing(16)
-        self.local_card = BoardCard(self.theme, "base", "This board")
-        self.remote_card = BoardCard(self.theme, "remote", "Remote board")
-        cards.addWidget(self.local_card, 1)
-        cards.addWidget(self.remote_card, 1)
-        root.addLayout(cards, 1)
 
         strip = QFrame()
         strip.setObjectName("strip")
@@ -803,14 +806,27 @@ class Window(QMainWindow):
         sl.addStretch()
         root.addWidget(strip)
 
-        root.addWidget(self.build_controls())
-        root.addWidget(self.build_log())
-
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setFrameShape(QFrame.NoFrame)
-        scroll.setWidget(page)
-        self.setCentralWidget(scroll)
+        # the two views: the boards' readings, and their settings with the log
+        self.views = QStackedWidget()
+        data = QWidget()
+        cards = QHBoxLayout(data)
+        cards.setContentsMargins(0, 0, 0, 0)
+        cards.setSpacing(16)
+        self.local_card = BoardCard(self.theme, "base", "This board")
+        self.remote_card = BoardCard(self.theme, "remote", "Remote board")
+        cards.addWidget(self.local_card, 1)
+        cards.addWidget(self.remote_card, 1)
+        self.views.addWidget(data)
+        control = QWidget()
+        cl = QVBoxLayout(control)
+        cl.setContentsMargins(0, 0, 0, 0)
+        cl.setSpacing(16)
+        cl.addWidget(self.build_controls(), 1)
+        self.views.addWidget(control)
+        root.addWidget(self.views, 1)
+        self.setCentralWidget(page)
+        for i in range(2):
+            QShortcut(QKeySequence(f"Ctrl+{i + 1}"), self, activated=lambda i=i: self.show_view(i))
         self.apply_theme()
 
         self.timer = QTimer(self)
@@ -940,9 +956,9 @@ class Window(QMainWindow):
         self.tabs.addTab(self.build_radio_tab(), "Radio")
         self.tabs.addTab(self.build_timing_tab(), "Timing")
         self.tabs.addTab(self.build_boards_tab(), "Boards")
+        self.tabs.addTab(self.build_log(), "Log")
         self.tabs.finish(label("Settings are kept by each board after a restart", "muted"))
-        lay.addWidget(self.tabs)
-        c.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Minimum)   # never squeezed: the page scrolls instead
+        lay.addWidget(self.tabs, 1)
         self.controls_built = True
         self.explain_sensor()
         self.explain_radio()
@@ -1132,10 +1148,13 @@ class Window(QMainWindow):
         return self.tab(*cols)
 
     def build_log(self):
-        c, lay = self.card()
+        c = QWidget()
+        lay = QVBoxLayout(c)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(10)
         hl = QHBoxLayout()
         hl.setSpacing(12)
-        hl.addWidget(label("Log", "section"))
+        hl.addWidget(label("Everything the boards say", "section"))
         hl.addStretch()
         self.logpath = label(f"Readings go to {self.state.csv_path}; everything the board prints to serial_*.log",
                              "muted")
@@ -1148,7 +1167,7 @@ class Window(QMainWindow):
         self.log = QPlainTextEdit()
         self.log.setReadOnly(True)
         self.log.setMaximumBlockCount(2000)
-        self.log.setMinimumHeight(220)
+        self.log.setMinimumHeight(120)
         lay.addWidget(self.log, 1)
         self.cmd = QLineEdit()
         self.cmd.setPlaceholderText("Type a firmware command, e.g. status, help, remote ping")
@@ -1159,6 +1178,11 @@ class Window(QMainWindow):
         row.addWidget(self.button("Send", self.send_typed))
         lay.addLayout(row)
         return c
+
+    def show_view(self, i):
+        """0 = the boards' readings, 1 = settings and log."""
+        self.views.setCurrentIndex(i)
+        self.view_switch.select(i)
 
     def apply_theme(self):
         self.setStyleSheet(qss(self.theme))

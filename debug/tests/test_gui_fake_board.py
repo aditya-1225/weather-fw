@@ -99,8 +99,11 @@ def main():
         win.local_card.chart.hover_x = win.local_card.chart.width() * 0.62
         pump(0.4)
         win.grab().save(os.path.join(shots, "gui_dark.png"))
-        page = win.centralWidget().widget()
-        page.grab().save(os.path.join(shots, "gui_dark_full.png"))
+        win.show_view(1)
+        pump(0.4)
+        win.grab().save(os.path.join(shots, "gui_dark_control.png"))
+        win.show_view(0)
+        pump(0.2)
         win.set_theme("light")
         pump(0.4)
         win.grab().save(os.path.join(shots, "gui_light.png"))

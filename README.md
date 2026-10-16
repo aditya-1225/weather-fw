@@ -33,24 +33,28 @@ pip install pyserial PySide6
 python3 host/weather_gui.py     # auto-detects the port; or --port /dev/ttyACM0; --theme dark|light
 ```
 
-Same serial reader and the same logs as the terminal UI below, in a window: each board's reading with a
-history chart (temperature or pressure, last 5 min to 24 hours; hover for values), its health report, the radio
-link, a log with a command line (**Clear** empties the view; the log files keep everything), and buttons for
-every command. The button at the top right switches between the dark and light look. The settings are in four
-tabs, each laid out in two columns:
+Same serial reader and the same logs as the terminal UI below, in a window with two views, switched at the top
+(or with Ctrl+1 / Ctrl+2). The radio link strip stays visible in both.
 
-- **Sensor:** the BMP280's oversampling, smoothing filter, mode (continuous, or one measurement per reading)
-  and rest time, applied to both boards, this board or the remote. A live explanation says what the settings
-  mean in practice (measurement time, how many new measurements each reading holds, how long the filter takes
-  to follow a sudden change, resolution) and warns when they don't make sense, e.g. when the chip is slower
-  than the readings.
-- **Radio:** channel, data rate and CRC. **Move both boards…** asks first, then moves both boards together
-  (see [Changing the radio link](#changing-the-radio-link)); it is off while the remote runs older firmware.
-  Also the transmit power per board, and the remote's retries with the longest a reading can take to give up.
-  Shows the current and previous link, and a warning while a board is searching.
-- **Timing:** the sample interval and the health-report interval on both boards. The remote's health interval
-  isn't in any packet, so the window works it out from the time between its reports.
-- **Boards:** ping the remote, radio re-init, sensor re-detect, the wiring check and restart, per board.
+- **Data:** each board's reading with a history chart (temperature or pressure, last 5 min to 24 hours; hover
+  for values) and its health report.
+- **Control:** the settings, in five tabs:
+  - **Sensor:** the BMP280's oversampling, smoothing filter, mode (continuous, or one measurement per reading)
+    and rest time, applied to both boards, this board or the remote. A live explanation says what the settings
+    mean in practice (measurement time, how many new measurements each reading holds, how long the filter takes
+    to follow a sudden change, resolution) and warns when they don't make sense, e.g. when the chip is slower
+    than the readings.
+  - **Radio:** channel, data rate and CRC. **Move both boards…** asks first, then moves both boards together
+    (see [Changing the radio link](#changing-the-radio-link)); it is off while the remote runs older firmware.
+    Also the transmit power per board, and the remote's retries with the longest a reading can take to give up.
+    Shows the current and previous link, and a warning while a board is searching.
+  - **Timing:** the sample interval and the health-report interval on both boards. The remote's health interval
+    isn't in any packet, so the window works it out from the time between its reports.
+  - **Boards:** ping the remote, radio re-init, sensor re-detect, the wiring check and restart, per board.
+  - **Log:** everything the boards print, with a command line for any firmware command. **Clear** empties the view;
+    the log files keep everything.
+
+The button at the top right switches between the dark and light look.
 
 Each Apply shows when each board confirms. The window sends the base one command line at a time and waits for
 its answer before the next (see [Serial protocol](#serial-protocol-115200-baud)), and remote commands one at a

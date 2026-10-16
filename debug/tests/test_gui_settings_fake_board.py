@@ -181,7 +181,7 @@ def main():
 
     if shots:
         os.makedirs(shots, exist_ok=True)
-        win.resize(1400, 1500)
+        win.show_view(1)
         for i, name in enumerate(("sensor", "radio")):
             win.tabs.setCurrentIndex(i)
             pump(0.3)
