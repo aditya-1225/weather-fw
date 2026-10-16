@@ -1,0 +1,369 @@
+recording started 20:30:49
+SEC t=8 valid replies 0/50
+SEC t=9 valid replies 0/50
+SEC t=10 valid replies 0/50
+SEC t=11 valid replies 0/50
+SEC t=12 valid replies 0/50
+SEC t=13 valid replies 0/50
+SEC t=14 valid replies 0/50
+SEC t=15 valid replies 0/50
+SEC t=16 valid replies 0/50
+SEC t=17 valid replies 0/50
+SEC t=18 valid replies 0/50
+SEC t=19 valid replies 0/50
+SEC t=20 valid replies 0/50
+SEC t=21 valid replies 0/50
+===== RADIODIAG =====
+MCU VDD = 4.63 V
+SDA/A4 pull-up rail = 3.29 V   SCL/A5 = 3.29 V
+drive test (pin: hi/lo readback): D9:1/0 ok D11:1/0 ok D13:1/0 ok D8:1/0 ok
+released lines: CE(D9)=H MOSI(D11)=H SCK(D13)=H CSN(D8)=H
+MISO with CSN high = H   with CSN low = H  (radio does NOT drive MISO)
+bit-bang SPI: r00=FF r01=FF r03=FF r05=FF r06=FF status=FF
+bit-bang write RF_CH=0x2A, read back 0xFF  (write FAILED)
+hw SPI 125 kHz: STATUS=FF CONFIG=FF RF_CH=FF
+hw SPI 1000 kHz: STATUS=FF CONFIG=FF RF_CH=FF
+hw SPI 4000 kHz: STATUS=FF CONFIG=FF RF_CH=FF
+hw SPI 8000 kHz: STATUS=FF CONFIG=FF RF_CH=FF
+===== END (now polling STATUS every 250 ms; send any key to rerun) =====
+CHANGE t=1555 STATUS=FF  (silent)
+SEC t=1 valid replies 0/1
+CHANGE t=1615 STATUS=0F  (partial)
+CHANGE t=1635 STATUS=FF  (silent)
+CHANGE t=1675 STATUS=0F  (partial)
+CHANGE t=1695 STATUS=FF  (silent)
+CHANGE t=1735 STATUS=0F  (partial)
+===== RADIODIAG =====
+MCU VDD = 4.63 V
+SDA/A4 pull-up rail = 3.29 V   SCL/A5 = 3.29 V
+drive test (pin: hi/lo readback): D9:1/0 ok D11:1/0 ok D13:1/0 ok D8:1/0 ok
+released lines: CE(D9)=H MOSI(D11)=H SCK(D13)=H CSN(D8)=H
+MISO with CSN high = H   with CSN low = H  (radio does NOT drive MISO)
+bit-bang SPI: r00=FF r01=FF r03=FF r05=FF r06=FF status=FF
+bit-bang write RF_CH=0x2A, read back 0xFF  (write FAILED)
+hw SPI 125 kHz: STATUS=FF CONFIG=FF RF_CH=FF
+hw SPI 1000 kHz: STATUS=FF CONFIG=FF RF_CH=FF
+hw SPI 4000 kHz: STATUS=FF CONFIG=FF RF_CH=FF
+hw SPI 8000 kHz: STATUS=FF CONFIG=FF RF_CH=FF
+===== END (now polling STATUS every 250 ms; send any key to rerun) =====
+CHANGE t=1555 STATUS=FF  (silent)
+SEC t=1 valid replies 0/1
+SEC t=2 valid replies 0/50
+SEC t=3 valid replies 0/50
+SEC t=4 valid replies 0/50
+SEC t=5 valid replies 0/50
+SEC t=6 valid replies 0/50
+SEC t=7 valid replies 0/50
+SEC t=8 valid replies 0/50
+===== RADIODIAG =====
+MCU VDD = 4.63 V
+SDA/A4 pull-up rail = 3.27 V   SCL/A5 = 3.26 V
+drive test (pin: hi/lo readback): D9:1/0 ok D11:1/0 ok D13:1/0 ok D8:1/0 ok
+released lines: CE(D9)=H MOSI(D11)=H SCK(D13)=H CSN(D8)=H
+MISO with CSN high = H   with CSN low = H  (radio does NOT drive MISO)
+bit-bang SPI: r00=FF r01=FF r03=FF r05=FF r06=FF status=FF
+bit-bang write RF_CH=0x2A, read back 0xFF  (write FAILED)
+hw SPI 125 kHz: STATUS=FF CONFIG=FF RF_CH=FF
+hw SPI 1000 kHz: STATUS=FF CONFIG=FF RF_CH=FF
+hw SPI 4000 kHz: STATUS=FF CONFIG=FF RF_CH=FF
+hw SPI 8000 kHz: STATUS=FF CONFIG=FF RF_CH=FF
+===== END (now polling STATUS every 250 ms; send any key to rerun) =====
+CHANGE t=1555 STATUS=FF  (silent)
+SEC t=1 valid replies 0/1
+SEC t=2 valid replies 0/50
+SEC t=3 valid replies 0/50
+CHANGE t=3956 STATUS=0E  <-- healthy reply
+CHANGE t=4436 STATUS=FF  (silent)
+SEC t=4 valid replies 24/50
+CHANGE t=4756 STATUS=0E  <-- healthy reply
+CHANGE t=4876 STATUS=FF  (silent)
+SEC t=5 valid replies 6/50
+CHANGE t=6056 STATUS=0E  <-- healthy reply
+SEC t=6 valid replies 26/50
+SEC t=7 valid replies 50/50
+SEC t=8 valid replies 50/50
+SEC t=9 valid replies 50/50
+CHANGE t=10216 STATUS=FF  (silent)
+SEC t=10 valid replies 32/50
+SEC t=11 valid replies 0/50
+SEC t=12 valid replies 0/50
+SEC t=13 valid replies 0/50
+SEC t=14 valid replies 0/50
+SEC t=15 valid replies 0/50
+SEC t=16 valid replies 0/50
+SEC t=17 valid replies 0/50
+SEC t=18 valid replies 0/50
+SEC t=19 valid replies 0/50
+SEC t=20 valid replies 0/50
+SEC t=21 valid replies 0/50
+SEC t=22 valid replies 0/50
+SEC t=23 valid replies 0/50
+SEC t=24 valid replies 0/50
+SEC t=25 valid replies 0/50
+SEC t=26 valid replies 0/50
+SEC t=27 valid replies 0/50
+SEC t=28 valid replies 0/50
+SEC t=29 valid replies 0/50
+SEC t=30 valid replies 0/50
+SEC t=31 valid replies 0/50
+SEC t=32 valid replies 0/50
+SEC t=33 valid replies 0/50
+SEC t=34 valid replies 0/50
+SEC t=35 valid replies 0/50
+SEC t=36 valid replies 0/50
+SEC t=37 valid replies 0/50
+SEC t=38 valid replies 0/50
+SEC t=39 valid replies 0/50
+SEC t=40 valid replies 0/50
+SEC t=41 valid replies 0/50
+SEC t=42 valid replies 0/50
+SEC t=43 valid replies 0/50
+SEC t=44 valid replies 0/50
+SEC t=45 valid replies 0/50
+SEC t=46 valid replies 0/50
+SEC t=47 valid replies 0/50
+SEC t=48 valid replies 0/50
+SEC t=49 valid replies 0/50
+SEC t=50 valid replies 0/50
+SEC t=51 valid replies 0/50
+SEC t=52 valid replies 0/50
+SEC t=53 valid replies 0/50
+SEC t=54 valid replies 0/50
+SEC t=55 valid replies 0/50
+SEC t=56 valid replies 0/50
+SEC t=57 valid replies 0/50
+SEC t=58 valid replies 0/50
+SEC t=59 valid replies 0/50
+SEC t=60 valid replies 0/50
+SEC t=61 valid replies 0/50
+SEC t=62 valid replies 0/50
+SEC t=63 valid replies 0/50
+SEC t=64 valid replies 0/50
+===== RADIODIAG =====
+MCU VDD = 4.63 V
+SDA/A4 pull-up rail = 3.29 V   SCL/A5 = 3.30 V
+drive test (pin: hi/lo readback): D9:1/0 ok D11:1/0 ok D13:1/0 ok D8:1/0 ok
+released lines: CE(D9)=H MOSI(D11)=H SCK(D13)=H CSN(D8)=H
+MISO with CSN high = H   with CSN low = H  (radio does NOT drive MISO)
+bit-bang SPI: r00=FF r01=FF r03=FF r05=FF r06=FF status=FF
+bit-bang write RF_CH=0x2A, read back 0xFF  (write FAILED)
+hw SPI 125 kHz: STATUS=FF CONFIG=FF RF_CH=FF
+hw SPI 1000 kHz: STATUS=FF CONFIG=FF RF_CH=FF
+hw SPI 4000 kHz: STATUS=FF CONFIG=FF RF_CH=FF
+hw SPI 8000 kHz: STATUS=FF CONFIG=FF RF_CH=FF
+===== END (now polling STATUS every 250 ms; send any key to rerun) =====
+CHANGE t=1555 STATUS=FF  (silent)
+SEC t=1 valid replies 0/1
+SEC t=2 valid replies 0/50
+SEC t=3 valid replies 0/50
+SEC t=4 valid replies 0/50
+CHANGE t=4956 STATUS=0F  (partial)
+CHANGE t=4976 STATUS=FF  (silent)
+CHANGE t=5016 STATUS=0F  (partial)
+CHANGE t=5056 STATUS=FF  (silent)
+CHANGE t=5096 STATUS=0F  (partial)
+CHANGE t=5116 STATUS=FF  (silent)
+CHANGE t=5136 STATUS=0F  (partial)
+CHANGE t=5176 STATUS=FF  (silent)
+CHANGE t=5196 STATUS=0F  (partial)
+CHANGE t=5276 STATUS=FF  (silent)
+CHANGE t=5296 STATUS=0F  (partial)
+CHANGE t=5396 STATUS=FF  (silent)
+CHANGE t=5416 STATUS=0F  (partial)
+CHANGE t=5456 STATUS=FF  (silent)
+CHANGE t=5496 STATUS=0F  (partial)
+CHANGE t=5516 STATUS=FF  (silent)
+SEC t=5 valid replies 18/50
+CHANGE t=5596 STATUS=0F  (partial)
+CHANGE t=5616 STATUS=FF  (silent)
+CHANGE t=5656 STATUS=0F  (partial)
+CHANGE t=5676 STATUS=FF  (silent)
+CHANGE t=5856 STATUS=0F  (partial)
+CHANGE t=5876 STATUS=FF  (silent)
+CHANGE t=5916 STATUS=0F  (partial)
+CHANGE t=5956 STATUS=FF  (silent)
+CHANGE t=5976 STATUS=0F  (partial)
+CHANGE t=5996 STATUS=FF  (silent)
+CHANGE t=6036 STATUS=0F  (partial)
+CHANGE t=6056 STATUS=FF  (silent)
+CHANGE t=6076 STATUS=0F  (partial)
+CHANGE t=6116 STATUS=FF  (silent)
+CHANGE t=6136 STATUS=0F  (partial)
+CHANGE t=6176 STATUS=FF  (silent)
+CHANGE t=6256 STATUS=0F  (partial)
+CHANGE t=6296 STATUS=FF  (silent)
+CHANGE t=6316 STATUS=0F  (partial)
+CHANGE t=6336 STATUS=FF  (silent)
+CHANGE t=6356 STATUS=0F  (partial)
+CHANGE t=6396 STATUS=FF  (silent)
+CHANGE t=6436 STATUS=0F  (partial)
+CHANGE t=6496 STATUS=FF  (silent)
+CHANGE t=6536 STATUS=0F  (partial)
+CHANGE t=6556 STATUS=FF  (silent)
+SEC t=6 valid replies 20/50
+CHANGE t=6596 STATUS=0F  (partial)
+CHANGE t=6636 STATUS=FF  (silent)
+CHANGE t=6656 STATUS=0F  (partial)
+CHANGE t=6756 STATUS=FF  (silent)
+CHANGE t=6776 STATUS=0F  (partial)
+CHANGE t=6876 STATUS=FF  (silent)
+CHANGE t=6896 STATUS=0F  (partial)
+CHANGE t=6936 STATUS=FF  (silent)
+CHANGE t=6976 STATUS=0F  (partial)
+CHANGE t=6996 STATUS=FF  (silent)
+CHANGE t=7016 STATUS=0F  (partial)
+CHANGE t=7036 STATUS=FF  (silent)
+CHANGE t=7076 STATUS=0F  (partial)
+CHANGE t=7136 STATUS=FF  (silent)
+CHANGE t=7156 STATUS=0F  (partial)
+CHANGE t=7236 STATUS=FF  (silent)
+SEC t=7 valid replies 23/50
+SEC t=8 valid replies 0/50
+SEC t=9 valid replies 0/50
+SEC t=10 valid replies 0/50
+SEC t=11 valid replies 0/50
+SEC t=12 valid replies 0/50
+SEC t=13 valid replies 0/50
+CHANGE t=13576 STATUS=0F  (partial)
+CHANGE t=13596 STATUS=FF  (silent)
+SEC t=14 valid replies 1/50
+SEC t=15 valid replies 0/50
+SEC t=16 valid replies 0/50
+SEC t=17 valid replies 0/50
+SEC t=18 valid replies 0/50
+SEC t=19 valid replies 0/50
+SEC t=20 valid replies 0/50
+SEC t=21 valid replies 0/50
+SEC t=22 valid replies 0/50
+CHANGE t=23496 STATUS=0F  (partial)
+CHANGE t=23516 STATUS=FF  (silent)
+CHANGE t=23536 STATUS=0F  (partial)
+SEC t=23 valid replies 3/50
+CHANGE t=23576 STATUS=FF  (silent)
+CHANGE t=23596 STATUS=0F  (partial)
+CHANGE t=23616 STATUS=FF  (silent)
+CHANGE t=23696 STATUS=0F  (partial)
+CHANGE t=23716 STATUS=FF  (silent)
+CHANGE t=23776 STATUS=0F  (partial)
+CHANGE t=23796 STATUS=FF  (silent)
+CHANGE t=23896 STATUS=0F  (partial)
+CHANGE t=23916 STATUS=FF  (silent)
+CHANGE t=23936 STATUS=0F  (partial)
+CHANGE t=23956 STATUS=FF  (silent)
+CHANGE t=24496 STATUS=0F  (partial)
+CHANGE t=24516 STATUS=FF  (silent)
+CHANGE t=24556 STATUS=0F  (partial)
+SEC t=24 valid replies 7/50
+CHANGE t=24576 STATUS=FF  (silent)
+CHANGE t=24596 STATUS=0F  (partial)
+CHANGE t=24656 STATUS=FF  (silent)
+SEC t=25 valid replies 3/50
+CHANGE t=26016 STATUS=0F  (partial)
+CHANGE t=26056 STATUS=FF  (silent)
+CHANGE t=26076 STATUS=0F  (partial)
+CHANGE t=26096 STATUS=FF  (silent)
+CHANGE t=26116 STATUS=0F  (partial)
+CHANGE t=26136 STATUS=FF  (silent)
+CHANGE t=26156 STATUS=0F  (partial)
+CHANGE t=26176 STATUS=FF  (silent)
+CHANGE t=26316 STATUS=0F  (partial)
+CHANGE t=26336 STATUS=FF  (silent)
+CHANGE t=26356 STATUS=0F  (partial)
+CHANGE t=26376 STATUS=FF  (silent)
+SEC t=26 valid replies 7/50
+SEC t=27 valid replies 0/50
+SEC t=28 valid replies 0/50
+SEC t=29 valid replies 0/50
+SEC t=30 valid replies 0/50
+SEC t=31 valid replies 0/50
+SEC t=32 valid replies 0/50
+SEC t=33 valid replies 0/50
+SEC t=34 valid replies 0/50
+SEC t=35 valid replies 0/50
+SEC t=36 valid replies 0/50
+SEC t=37 valid replies 0/50
+SEC t=38 valid replies 0/50
+SEC t=39 valid replies 0/50
+CHANGE t=39796 STATUS=0E  <-- healthy reply
+SEC t=40 valid replies 39/50
+SEC t=41 valid replies 50/50
+SEC t=42 valid replies 50/50
+SEC t=43 valid replies 50/50
+SEC t=44 valid replies 50/50
+SEC t=45 valid replies 50/50
+SEC t=46 valid replies 50/50
+SEC t=47 valid replies 50/50
+SEC t=48 valid replies 50/50
+SEC t=49 valid replies 50/50
+SEC t=50 valid replies 50/50
+SEC t=51 valid replies 50/50
+SEC t=52 valid replies 50/50
+SEC t=53 valid replies 50/50
+SEC t=54 valid replies 50/50
+SEC t=55 valid replies 50/50
+SEC t=56 valid replies 50/50
+SEC t=57 valid replies 50/50
+CHANGE t=58536 STATUS=FF  (silent)
+SEC t=58 valid replies 48/50
+SEC t=59 valid replies 0/50
+SEC t=60 valid replies 0/50
+SEC t=61 valid replies 0/50
+SEC t=62 valid replies 0/50
+SEC t=63 valid replies 0/50
+===== RADIODIAG =====
+MCU VDD = 4.63 V
+SDA/A4 pull-up rail = 3.28 V   SCL/A5 = 3.29 V
+drive test (pin: hi/lo readback): D9:1/0 ok D11:1/0 ok D13:1/0 ok D8:1/0 ok
+released lines: CE(D9)=F MOSI(D11)=F SCK(D13)=L CSN(D8)=F
+MISO with CSN high = F   with CSN low = L  (radio drives MISO: alive)
+bit-bang SPI: r00=08 r01=3F r03=03 r05=02 r06=0F status=0E
+bit-bang write RF_CH=0x2A, read back 0x2A  (write OK)
+hw SPI 125 kHz: STATUS=0E CONFIG=08 RF_CH=02
+hw SPI 1000 kHz: STATUS=0E CONFIG=08 RF_CH=02
+hw SPI 4000 kHz: STATUS=06 CONFIG=00 RF_CH=00
+hw SPI 8000 kHz: STATUS=06 CONFIG=00 RF_CH=00
+===== END (now polling STATUS every 250 ms; send any key to rerun) =====
+CHANGE t=1555 STATUS=0E  <-- healthy reply
+SEC t=1 valid replies 1/1
+SEC t=2 valid replies 50/50
+SEC t=3 valid replies 50/50
+SEC t=4 valid replies 50/50
+SEC t=5 valid replies 50/50
+SEC t=6 valid replies 50/50
+SEC t=7 valid replies 50/50
+SEC t=8 valid replies 50/50
+SEC t=9 valid replies 50/50
+SEC t=10 valid replies 50/50
+SEC t=11 valid replies 50/50
+SEC t=12 valid replies 50/50
+SEC t=13 valid replies 50/50
+SEC t=14 valid replies 50/50
+SEC t=15 valid replies 50/50
+SEC t=16 valid replies 50/50
+SEC t=17 valid replies 50/50
+SEC t=18 valid replies 50/50
+CHANGE t=19076 STATUS=0F  (partial)
+CHANGE t=19096 STATUS=FF  (silent)
+SEC t=19 valid replies 26/50
+SEC t=20 valid replies 0/50
+CHANGE t=20816 STATUS=0F  (partial)
+CHANGE t=20836 STATUS=FF  (silent)
+CHANGE t=21376 STATUS=0F  (partial)
+CHANGE t=21396 STATUS=FF  (silent)
+CHANGE t=21416 STATUS=0F  (partial)
+CHANGE t=21436 STATUS=FF  (silent)
+SEC t=21 valid replies 3/50
+CHANGE t=21596 STATUS=0F  (partial)
+CHANGE t=21616 STATUS=FF  (silent)
+CHANGE t=21656 STATUS=0F  (partial)
+CHANGE t=21676 STATUS=FF  (silent)
+CHANGE t=21756 STATUS=0F  (partial)
+CHANGE t=21776 STATUS=FF  (silent)
+CHANGE t=22156 STATUS=0F  (partial)
+CHANGE t=22176 STATUS=FF  (silent)
+CHANGE t=22236 STATUS=0F  (partial)
+CHANGE t=22276 STATUS=FF  (silent)
+CHANGE t=22356 STATUS=0F  (partial)
+CHANGE t=22376 STATUS=FF  (silent)
+SEC t=22 valid replies 7/50
+recording ended 20:33:49

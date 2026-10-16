@@ -1,0 +1,23 @@
+remote ping tests, base at PA MAX, remote ~10 m away through concrete
+
+21:38 firmware with 30 s command timeout, single send per reading:
+ping 1: no answer (sent before the freshly-rebooted base had heard the remote)
+ping 2: OK after 1.1 s
+ping 3: OK after 1.0 s
+ping 4: OK after 6.0 s
+ping 5: OK after 15.0 s
+ping 6: TIMEOUT after 30.0 s
+ping 7: OK after 4.0 s
+ping 8: OK after 10.0 s
+-> 6/7 OK, median 6.0 s
+
+22:03 weak-signal changes (up to 4 sends per reading, 2.75 ms retry gap, base drops repeats):
+ping 1: OK after 5.7 s
+ping 2: OK after 2.0 s
+ping 3: OK after 1.0 s
+ping 4: OK after 5.0 s
+ping 5: OK after 3.0 s
+ping 6: OK after 0.9 s
+ping 7: OK after 1.0 s
+ping 8: OK after 2.0 s
+-> 8/8 OK, median 2.0 s

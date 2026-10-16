@@ -1,0 +1,27 @@
+===== RADIODIAG =====
+MCU VDD = 4.63 V
+SDA/A4 pull-up rail = 3.29 V   SCL/A5 = 3.29 V
+drive test (pin: hi/lo readback): D9:1/0 ok D11:1/0 ok D13:1/0 ok D8:1/0 ok
+released lines: CE(D9)=H MOSI(D11)=H SCK(D13)=H CSN(D8)=H
+MISO with CSN high = H   with CSN low = H  (radio does NOT drive MISO)
+bit-bang SPI: r00=FF r01=FF r03=FF r05=FF r06=FF status=FF
+bit-bang write RF_CH=0x2A, read back 0xFF  (write FAILED)
+hw SPI 125 kHz: STATUS=FF CONFIG=FF RF_CH=FF
+hw SPI 1000 kHz: STATUS=FF CONFIG=FF RF_CH=FF
+hw SPI 4000 kHz: STATUS=FF CONFIG=FF RF_CH=FF
+hw SPI 8000 kHz: STATUS=FF CONFIG=FF RF_CH=FF
+===== END (now polling STATUS every 250 ms; send any key to rerun) =====
+POLL t=1555 STATUS=FF (no answer)
+===== RADIODIAG =====
+MCU VDD = 4.58 V
+SDA/A4 pull-up rail = 3.29 V   SCL/A5 = 3.29 V
+drive test (pin: hi/lo readback): D9:1/0 ok D11:1/0 ok D13:1/0 ok D8:1/0 ok
+released lines: CE(D9)=H MOSI(D11)=H SCK(D13)=H CSN(D8)=H
+MISO with CSN high = H   with CSN low = H  (radio does NOT drive MISO)
+bit-bang SPI: r00=FF r01=FF r03=FF r05=FF r06=FF status=FF
+bit-bang write RF_CH=0x2A, read back 0xFF  (write FAILED)
+hw SPI 125 kHz: STATUS=FF CONFIG=FF RF_CH=FF
+hw SPI 1000 kHz: STATUS=FF CONFIG=FF RF_CH=FF
+hw SPI 4000 kHz: STATUS=FF CONFIG=FF RF_CH=FF
+hw SPI 8000 kHz: STATUS=FF CONFIG=FF RF_CH=FF
+===== END (now polling STATUS every 250 ms; send any key to rerun) =====
