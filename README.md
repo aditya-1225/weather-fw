@@ -33,12 +33,33 @@ pip install pyserial PySide6
 python3 host/weather_gui.py     # auto-detects the port; or --port /dev/ttyACM0; --theme dark|light
 ```
 
-Same serial reader and the same logs as the terminal UI below, in a window: each board's reading with a
-history chart (temperature or pressure, last 5 min to 24 hours; hover for values), its health report, the radio
-link, a log with a command line, and buttons for every command. **Timing** sets the sample interval and the
-health-report interval on both boards and shows when each board confirms. Both go back to their defaults
-(1000 ms, 10 s) when a board restarts. The remote's health interval isn't in any packet, so the window works it
-out from the time between its reports.
+Same serial reader and the same logs as the terminal UI below, in a window with two views, switched at the top
+(or with Ctrl+1 / Ctrl+2). The radio link strip stays visible in both.
+
+- **Data:** each board's reading with a history chart (temperature or pressure, last 5 min to 24 hours; hover
+  for values) and its health report.
+- **Control:** the settings, in five tabs:
+  - **Sensor:** the BMP280's oversampling, smoothing filter, mode (continuous, or one measurement per reading)
+    and rest time, applied to both boards, this board or the remote. A live explanation says what the settings
+    mean in practice (measurement time, how many new measurements each reading holds, how long the filter takes
+    to follow a sudden change, resolution) and warns when they don't make sense, e.g. when the chip is slower
+    than the readings.
+  - **Radio:** channel, data rate and CRC. **Move both boards…** asks first, then moves both boards together
+    (see [Changing the radio link](#changing-the-radio-link)); it is off while the remote runs older firmware.
+    Also the transmit power per board, and the remote's retries with the longest a reading can take to give up.
+    Shows the current and previous link, and a warning while a board is searching.
+  - **Timing:** the sample interval and the health-report interval on both boards. The remote's health interval
+    isn't in any packet, so the window works it out from the time between its reports.
+  - **Boards:** ping the remote, radio re-init, sensor re-detect, the wiring check and restart, per board.
+  - **Log:** everything the boards print, with a command line for any firmware command. **Clear** empties the view;
+    the log files keep everything.
+
+The button at the top right switches between the dark and light look.
+
+Each Apply shows when each board confirms. The window sends the base one command line at a time and waits for
+its answer before the next (see [Serial protocol](#serial-protocol-115200-baud)), and remote commands one at a
+time, because the base holds only one remote command and a newer one replaces it. All settings are kept in
+each board's EEPROM, so they survive a restart.
 
 On start the charts are filled with the last 24 hours from the earlier `host/logs/weather_*.csv` files
 (this window's and the terminal UI's), once the window knows which board is plugged in. A break in the line
@@ -93,8 +114,8 @@ What the firmware does about it:
 
 * **Register read-back every 2 s** on both boards: channel, data rate, CRC and chip presence. If any of
   them doesn't match, the board re-initialises the radio.
-* **Weak-link tolerance.** If the remote hears no ACK, it sends the same reading again, up to 4 times, a few ms
-  apart. That gives it more chances to hear the base and any command riding on the ACK; the base drops the
+* **Weak-link tolerance.** If the remote hears no ACK, it sends the same reading again, up to 4 times by
+  default (`retry` changes it), a few ms apart. That gives it more chances to hear the base and any command riding on the ACK; the base drops the
   repeats. The remote only re-initialises its radio after 30 readings in a row get no ACK at all.
 * The **base** re-initialises its radio every 5 s while it hears nothing, so it doesn't matter which
   board is switched on first.
@@ -152,7 +173,8 @@ after the script stops. `--quiet` turns off the beep.
 2. **Separate 3.3 V regulator** (AMS1117-3.3 or similar, fed from 5 V) for the PA+LNA module, not the
    Every's 3V3 pin.
 3. **Boards close together (< ~5 m):** use PA `MIN` or `LOW`. At HIGH/MAX the receiver's LNA saturates
-   and packets get lost. Default is LOW. Raise it with `a`/`A` when the boards are far apart.
+   and packets get lost. Default is LOW. Raise it with `a`/`A` when the boards are far apart. The level is
+   saved on the board.
 4. Fit the antennas, and keep the modules away from the USB cable and the Every's regulator.
 
 ## Serial protocol (115200 baud)
@@ -161,9 +183,11 @@ The base's serial is the source of truth. The UI only parses these lines:
 
 ```
 DATA,L|R,seq,uptime_ms,temp_c,pressure_pa,sensor_ok           L = this board, R = remote (base only)
-LINK,up,rx,lost,strong,arc,r_tx_fails,r_radio_inits,r_pa,r_interval_ms,r_reset_cause,repeats   (base)
+LINK,up,rx,lost,strong,arc,r_tx_fails,r_radio_inits,r_pa,r_interval_ms,r_reset_cause,repeats,
+     r_bmp,r_retry,r_searching                                                           (base)
 TX,ok,arc,tx_ok,tx_fails,radio_inits,attempts                                           (remote)
-STAT,role,radio_ok,sensor_ok,uptime_ms,radio_inits,pa,interval_ms,reset_cause,health_ms
+STAT,role,radio_ok,sensor_ok,uptime_ms,radio_inits,pa,interval_ms,reset_cause,health_ms,
+     bmp,retry,link,prev_link,searching
 CMD,L|R,seq,name,QUEUED|OK|BAD_ARG|FAILED|UNKNOWN|TIMEOUT|REPLACED
 LOG,text
 W,valid,samples,last_status_hex                                     (watch mode, every 100 ms)
@@ -185,10 +209,67 @@ HEALTH,L|R,seq,uptime_ms,vdd_mv,rail_3v3_mv,mcu_temp_c,radio_power_losses,radio_
   including re-sends, and % of ACKs heard above -64 dBm. Base: remote readings received, repeat copies
   received, and % of them above -64 dBm.
 
-Commands (one per line): `help`, `status`, `diag`, `watch`, `ping`, `reset`, `radio`, `sensor`, `interval <ms>`,
-`pa <0-3>`, `health <ms>` (2000-60000). On the base, put `remote ` in front of any of them to run it on the remote board.
+The settings fields at the end of `STAT` and `LINK` use the same codes as the commands below:
 
-Radio settings: channel 108, 250 kbps, 16-bit CRC, auto-ack with ACK payloads, 15 retries 2.75 ms apart,
-up to 4 sends per reading.
-To move both boards to another channel or address, change `RF_CHANNEL` / `PIPE_ADDR` in the sketch and
-re-upload to both.
+- `STAT`: `bmp`, `retry` and `link` are this board's settings, `prev_link` the link before the last change
+  (tried while searching), `searching` 1 while the board is looking for the other one.
+- `LINK`: `r_bmp`, `r_retry` are the remote's sensor and retry settings, `r_searching` 1 while the remote is
+  searching (it isn't hearing the base). A remote with firmware from before these commands sends a shorter
+  packet, and the base prints `-,-,-` for them.
+
+New fields always go at the end of a line, so older parsers keep working.
+
+Commands (one per line): `help`, `status`, `diag`, `watch`, `ping`, `reset`, `radio`, `sensor`, `interval <ms>`,
+`pa <0-3>`, `health <ms>` (2000-60000), and the settings below. On the base, put `remote ` in front of any of
+them from `ping` on to run it on the remote board. Each command answers with a `CMD` line. Send the next line
+only after that answer: a line sent straight after another could arrive garbled (seen once, as a
+`remote bmp …` sent straight after a `bmp` that moved the base from one per reading to continuous). A line the
+board doesn't understand is shown as `LOG,not a command: '…'`, with control bytes as `\xNN`, followed by the
+help text.
+
+### Settings codes
+
+Each setting is one decimal number, one digit (or group of digits) per part:
+
+| Command | Parts | Default |
+|---|---|---|
+| `bmp <TPFSM>` | **T**, **P** temperature / pressure oversampling 1-5 (×1 ×2 ×4 ×8 ×16); **F** filter 0-4 (off ×2 ×4 ×8 ×16); **S** rest time between measurements 0-7 (0.5 62.5 125 250 500 1000 2000 4000 ms); **M** mode 0 = continuous, 1 = one measurement per reading | `25410`: temp ×2, pressure ×16, filter ×16, 62.5 ms, continuous |
+| `link <CCCRK>` | **CCC** channel 0-125 (2400 + channel MHz); **R** rate 0 = 1 Mbps, 1 = 2 Mbps, 2 = 250 kbps; **K** CRC 1 = 8-bit, 2 = 16-bit | `10822`: channel 108, 250 kbps, 16-bit CRC |
+| `retry <DDCCA>` | **DD** wait between tries 0-15 (250 µs steps, 0 = 250 µs); **CC** retries 0-15; **A** sends per reading 1-9 | `10154`: 2.75 ms, 15 retries, 4 sends |
+
+- `bmp` writes the BMP280 and reads its registers back. If they don't match it logs both and answers
+  `FAILED`. `diag` prints the registers too. In one-per-reading mode the board starts a measurement for each
+  reading and waits the datasheet's longest measurement time (up to 76 ms at ×16 / ×16).
+- `retry`: the wait between tries is raised to what the base's ACK needs, 1500 µs at 250 kbps and 500 µs at
+  1 or 2 Mbps.
+- Channels above 83 (2483.5 MHz) are outside the licence-free 2.4 GHz band in most countries. The default,
+  108, is one of them.
+- An unknown or out-of-range code answers `BAD_ARG`.
+
+### Saved settings
+
+The interval, health interval, PA level, sensor, retry and link settings, and the previous link, are kept
+in EEPROM. They survive a restart and a re-upload (the Every's EESAVE fuse is set). The boot log says
+`settings loaded from EEPROM` or `no saved settings, using defaults`. So the build-time defaults, including
+`flash.sh --pa`, only apply to a board that has nothing saved; use `pa <0-3>` to change a board that has.
+
+### Changing the radio link
+
+Use `remote link <code>` on the base (or **Move both boards…** in the window), not `link` on one board:
+the boards have to move together. The base passes the change to the remote, the remote confirms on the old
+settings and switches once that confirmation is acknowledged (or after 3 failed sends, in case only the ACKs
+are lost), and the base switches when it sees the confirmation. `link` typed on one board moves only that
+board, which then can't hear the other.
+
+If either board hears nothing for max(15 s, 3 readings + 5 s), it searches: it cycles through the link
+settings it knows, the current ones, the previous ones and the defaults. The base stays 1.5 s on each; the
+remote stays 6 s on each and sends a probe every 300 ms. The settings they meet on become the current ones.
+If a link change caused it, the remote reports that command to the base as `FAILED`.
+
+A link can also work one way only: the base hears the remote, but the remote doesn't hear the base's ACKs.
+The remote then searches, and marks its packets as searching. The base doesn't take those packets as the
+link found, and after 3 s of them it searches too, until both meet on settings that work both ways. The GUI
+shows this as "⚠ One way". The pipe address
+(`PIPE_ADDR`) can only be changed in the sketch, on both boards.
+
+Other radio settings: auto-ack with ACK payloads.

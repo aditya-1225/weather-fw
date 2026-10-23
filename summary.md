@@ -10,8 +10,8 @@ Give the desktop GUI (`host/weather_gui.py`) control over the BMP280's oversampl
 |---|---|
 | Base board (B800, on USB) | **Flashed with the new firmware** (built with `--pa max`). Settings now: sensor `25410` (the default: temp ×2, pressure ×16, filter ×16, continuous, 62.5 ms rest), interval 1000 ms, PA MAX, link channel 108 / 250 kbps / CRC 16. |
 | Remote board (2CF4) | **Not flashed. Still on the old firmware.** Linked over radio, 200 ms interval, PA MAX. It answers the new commands with `UNKNOWN`, as expected. |
-| Open bug | One known bug in how the base reads commands (below). Don't flash the remote until it's fixed. |
-| Tests | 96 checks across 6 test files, all passing (no hardware needed). |
+| Open bug | One known bug in how the base reads commands (below). The GUI no longer triggers it (follow-up, below); the firmware cause is still unknown. |
+| Tests | 101 checks across 6 test files, all passing (no hardware needed). |
 
 ## What was checked first
 
@@ -74,16 +74,30 @@ If the base is in **one-per-reading mode** and receives a command switching it b
 - The base now runs the build that prints `LOG,not a command: '…'`, but its output hasn't been captured yet. That's the next step: rerun `burst4.py` (in the session scratchpad) showing `LOG,not` lines.
 - Once one try with a 50 ms gap worked, so a short pause between the two commands in the GUI may be a workaround. The real cause should still be found.
 
+### Follow-up (cloud session, no hardware)
+
+- **GUI no longer sends lines back to back.** `host/weather_gui.py` now gives the base one command line at a time: the next goes only after the base has answered the one before (`CMD,L,…`, or `CMD,R,…,QUEUED` for a remote command) plus 0.2 s, or after 2 s without an answer (a base with older firmware prints its help instead of a `CMD` line). So Apply with "Both boards" sends `bmp …`, waits for the base to finish it, then sends `remote bmp …`. Remote commands still also wait for the previous remote command to finish, as before.
+- Tests updated for the new order: `test_gui_settings_fake_board.py` now has 31 checks (new: the remote half waits for this board's answer, and goes anyway once the answer wait runs out); `test_gui_fake_board.py` still 16.
+- The firmware cause is **not** found: it needs the board's `LOG,not a command: '…'` output (rerun `burst4.py`), which this session couldn't capture. Reading the code found nothing in the line reader itself (no re-entry, no buffer overflow, `strtok` restarted per line). The README now tells other scripts to wait for each `CMD` answer too.
+- Docs done: README (Sensor/Radio tabs, settings codes, EEPROM persistence, link changes and the search, STAT/LINK fields, one-line-at-a-time rule) and the `--pa` note in `debug/flash.sh`.
+
+### Follow-up: one-way link (2026-10-16, after flashing the remote)
+
+- Moving to channel 80 failed cleanly: neither board heard the other there, both searched and met on 108 again after about 23 s. Most likely something strong near 2480 MHz where the boards are.
+- On channel 90 the link went up and down for minutes. The link-up times came every 18-21 s, which matches the remote cycling through its 3 link settings (6 s each): the base heard the remote while it was on 90, but the remote didn't hear the base's ACKs there, so it never stopped searching. The base took the remote's packets as "link found" and stayed on 90, so they never met on 108, which works both ways. A `remote link` sent then timed out, as it rides on those ACKs.
+- **Fix (firmware, both boards):** the remote marks its packets while it searches (top bit of `sensorBits`). The base doesn't count marked packets as the link found, and after 3 s of them it searches too. When the remote's search ends on an ACK it re-sends the reading unmarked at once, so the base settles on the same settings. No health packets while searching (they can't carry the mark). `LINK` gains `r_searching`; the GUI shows "⚠ One way" and explains it in the Radio tab.
+- Compiled for both roles with avr-gcc 14 and the megaAVR core and libraries from GitHub (no warnings); not run on the boards yet. Needs flashing on both.
+- Still open: the GUI says "✓ The remote confirmed and switched" even when the change doesn't hold (the base clears the command on the remote's OK, so the later `FAILED` never reaches it).
+
 ## Not done yet
 
-- Flashing the remote, which should wait for the bug fix. Steps, once it's fixed: close the GUI, plug the remote into USB, then run
+- Flashing the remote. The GUI no longer triggers the open bug, so this no longer has to wait for the firmware cause. Steps: close the GUI, plug the remote into USB, then run
   ```
   debug/flash.sh remote --pa max --board 2CF4
   python3 debug/serial_probe.py --board 2CF4 --send status --secs 5
   ```
   Expect `no saved settings, using defaults`, and a STAT line ending in `,25410,10154,10822,10822,0`. Then unplug it, power it as before, and the base should show its settings instead of `-,-`.
 - On hardware, with both boards flashed: a real "Move both boards" link change, the remote's search and probes, and the case where a change fails and both go back.
-- Docs: README (new commands, codes, EEPROM persistence, STAT/LINK fields) and the `--pa` note in `debug/flash.sh`.
 - Leftover from testing: the base's saved "previous link" is channel 90. It only adds one setting to the search list, and the GUI shows it as "Before that: channel 90". There's no command to clear it. It goes away after the next real link change.
 
 ## Files

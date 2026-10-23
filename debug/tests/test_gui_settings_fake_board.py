@@ -100,8 +100,10 @@ def main():
     sent()
     win.apply_sensor()
     pump(0.4)
-    checks.append(("Apply sends bmp 15010 to both", sent() == ["bmp 15010", "remote bmp 15010"]))
-    board("CMD,L,0,bmp,OK", "CMD,R,6,bmp,QUEUED")
+    checks.append(("Apply sends bmp 15010 to this board first", sent() == ["bmp 15010"]))
+    board("CMD,L,0,bmp,OK")
+    checks.append(("and the remote's once this board has answered", sent() == ["remote bmp 15010"]))
+    board("CMD,R,6,bmp,QUEUED")
     checks.append(("waits for the remote", "Waiting" in win.sensor_result.text()))
     board("CMD,R,6,bmp,OK")
     checks.append(("confirms both", win.sensor_result.text() == "✓ Applied on both boards."))
@@ -115,6 +117,17 @@ def main():
     checks.append(("explains a sensor that didn't keep the settings",
                    "didn't keep the settings" in win.sensor_result.text()
                    and win.sensor_result.property("tone") == "crit"))
+
+    # A base that never answers (older firmware prints its help instead) doesn't hold up the queue for good
+    win.sensor_target.setCurrentIndex(0)
+    win.apply_sensor()
+    pump(1.0)
+    first = sent()
+    pump(1.6)
+    checks += [("no answer: the remote's command waits", first == ["bmp 15010"]),
+               ("and goes after the answer wait", sent() == ["remote bmp 15010"])]
+    board("CMD,R,7,bmp,QUEUED", "CMD,R,7,bmp,OK")
+    win.pending.pop("sensor", None)
 
     # Remote commands one at a time
     win.set_retry_controls(weather_gui.Retry(12, 15, 5))
@@ -159,13 +172,16 @@ def main():
     checks.append(("explains a link change that didn't work",
                    "couldn't reach the base on the new settings" in win.link_result.text()))
 
-    board(STAT.format(bmp=15010, retry=10154, link=9002, prev=10822, search=1), LINK.format(up=0, rbmp=35301, rretry=8103))
+    board(STAT.format(bmp=15010, retry=10154, link=9002, prev=10822, search=0), LINK.format(up=1, rbmp=35301, rretry="8103,1"))
+    checks += [("a remote that can't hear the base shows as one way", win.link_pill.text() == "⚠ One way"),
+               ("and is explained", "can't hear this board's replies" in win.link_alert.text())]
+    board(STAT.format(bmp=15010, retry=10154, link=9002, prev=10822, search=1), LINK.format(up=0, rbmp=35301, rretry="8103,0"))
     checks += [("searching shows in the link strip", win.link_pill.text() == "⚠ Searching"),
                ("and under the link settings", "trying the link settings it knows" in win.link_alert.text())]
 
     if shots:
         os.makedirs(shots, exist_ok=True)
-        win.resize(1400, 1500)
+        win.show_view(1)
         for i, name in enumerate(("sensor", "radio")):
             win.tabs.setCurrentIndex(i)
             pump(0.3)
